@@ -1,0 +1,165 @@
+import axios, { AxiosInstance, AxiosResponse } from "axios";
+
+// API 기본 설정
+const API_BASE_URL =
+  process.env.REACT_APP_API_URL || "http://127.0.0.1:5001/api";
+
+// Axios 인스턴스 생성
+const apiClient: AxiosInstance = axios.create({
+  baseURL: API_BASE_URL,
+  headers: {
+    "Content-Type": "application/json",
+  },
+});
+
+// 응답 인터셉터 (에러 처리)
+apiClient.interceptors.response.use(
+  (response: AxiosResponse) => {
+    return response;
+  },
+  (error) => {
+    console.error("API 오류:", error);
+    return Promise.reject(error);
+  }
+);
+
+// 타입 정의
+export interface Project {
+  id: number;
+  name: string;
+  description: string;
+  user_id: number;
+  created_at: string;
+  updated_at: string;
+  keyword_count: number;
+  crawling_count: number;
+}
+
+export interface Keyword {
+  id: number;
+  project_id: number;
+  keyword: string;
+  category: string;
+  created_at: string;
+}
+
+export interface CrawlingResult {
+  id: number;
+  project_id: number;
+  url: string;
+  content: string;
+  status: string;
+  error_message: string;
+  crawled_at: string;
+}
+
+export interface FeatureAnalysis {
+  id: number;
+  project_id: number;
+  keyword_id: number;
+  url: string;
+  support_status: "O" | "X" | "△";
+  confidence_score: number;
+  matched_text: string;
+  analyzed_at: string;
+}
+
+// 프로젝트 API
+export const projectAPI = {
+  getProjects: () => apiClient.get("/projects/"),
+
+  createProject: (name: string, description: string) =>
+    apiClient.post("/projects/", { name, description }),
+
+  getProject: (id: number) => apiClient.get(`/projects/${id}/`),
+
+  updateProject: (id: number, data: { name?: string; description?: string }) =>
+    apiClient.put(`/projects/${id}/`, data),
+
+  deleteProject: (id: number) => apiClient.delete(`/projects/${id}/`),
+};
+
+// 키워드 API
+export const keywordAPI = {
+  getKeywords: (projectId: number) =>
+    apiClient.get(`/keywords/projects/${projectId}/keywords`),
+
+  createKeyword: (projectId: number, keyword: string, category: string) =>
+    apiClient.post(`/keywords/projects/${projectId}/keywords`, {
+      keyword,
+      category,
+    }),
+
+  updateKeyword: (
+    keywordId: number,
+    data: { keyword?: string; category?: string }
+  ) => apiClient.put(`/keywords/${keywordId}`, data),
+
+  deleteKeyword: (keywordId: number) =>
+    apiClient.delete(`/keywords/${keywordId}`),
+
+  uploadKeywords: (projectId: number, file: File) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    return apiClient.post(
+      `/keywords/projects/${projectId}/keywords/upload`,
+      formData,
+      {
+        headers: { "Content-Type": "multipart/form-data" },
+      }
+    );
+  },
+
+  downloadKeywords: (projectId: number) =>
+    apiClient.get(`/keywords/projects/${projectId}/keywords/download`, {
+      responseType: "blob",
+    }),
+};
+
+// 크롤링 API
+export const crawlingAPI = {
+  startCrawling: (projectId: number, urls: string[]) =>
+    apiClient.post(`/crawling/projects/${projectId}/crawl`, { urls }),
+
+  getCrawlingStatus: (projectId: number) =>
+    apiClient.get(`/crawling/projects/${projectId}/crawl/status`),
+
+  getCrawlingResults: (projectId: number, page = 1, perPage = 20) =>
+    apiClient.get(`/crawling/projects/${projectId}/results`, {
+      params: { page, per_page: perPage },
+    }),
+
+  getCrawlingResult: (resultId: number) =>
+    apiClient.get(`/crawling/results/${resultId}`),
+
+  deleteCrawlingResult: (resultId: number) =>
+    apiClient.delete(`/crawling/results/${resultId}`),
+};
+
+// 리포트 API
+export const reportAPI = {
+  generatePDFReport: (projectId: number) =>
+    apiClient.get(`/reports/projects/${projectId}/report/pdf`, {
+      responseType: "blob",
+    }),
+
+  generateCSVReport: (projectId: number) =>
+    apiClient.get(`/reports/projects/${projectId}/report/csv`, {
+      responseType: "blob",
+    }),
+
+  getReportSummary: (projectId: number) =>
+    apiClient.get(`/reports/projects/${projectId}/report/summary`),
+
+  getDetailedAnalysis: (projectId: number, page = 1, perPage = 20) =>
+    apiClient.get(`/reports/projects/${projectId}/report/analysis`, {
+      params: { page, per_page: perPage },
+    }),
+};
+
+// 헬스체크 API
+export const healthAPI = {
+  checkHealth: () => apiClient.get("/health"),
+};
+
+export default apiClient;
