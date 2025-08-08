@@ -1,0 +1,95 @@
+version: '3.8'
+
+services:
+  # PostgreSQL 데이터베이스
+  postgres:
+    image: postgres:13
+    container_name: feature_detective_db
+    environment:
+      POSTGRES_DB: feature_detective
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - feature_detective_network
+
+  # Redis 메시지 브로커
+  redis:
+    image: redis:7-alpine
+    container_name: feature_detective_redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - feature_detective_network
+
+  # Flask 백엔드
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: feature_detective_backend
+    environment:
+      - FLASK_APP=app.py
+      - FLASK_ENV=development
+      - DATABASE_URL=postgresql://postgres:password@postgres:5432/feature_detective
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./backend:/app
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - feature_detective_network
+
+  # Celery 워커
+  celery_worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: feature_detective_celery
+    command: celery -A app.celery worker --loglevel=info
+    environment:
+      - DATABASE_URL=postgresql://postgres:password@postgres:5432/feature_detective
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+    volumes:
+      - ./backend:/app
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - feature_detective_network
+
+  # React 프론트엔드
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: feature_detective_frontend
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    environment:
+      - REACT_APP_API_URL=http://localhost:5000/api
+    depends_on:
+      - backend
+    networks:
+      - feature_detective_network
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  feature_detective_network:
+    driver: bridge
