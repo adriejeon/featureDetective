@@ -20,4 +20,4 @@ if __name__ == '__main__':
         print("데이터베이스 테이블이 생성되었습니다.")
     
     # 개발 서버 실행
-    app.run(debug=True, host='0.0.0.0', port=5001)
+    app.run(debug=True, host='0.0.0.0', port=5002)

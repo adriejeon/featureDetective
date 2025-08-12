@@ -11,6 +11,7 @@ from models.project import Project
 from models.keyword import Keyword
 from models.crawling_result import CrawlingResult
 from models.feature_analysis import FeatureAnalysis
+from models.ai_analysis import AIAnalysis, ExtractedFeature, ProductComparison
 
 def create_app(config_class=Config):
     """애플리케이션 팩토리 패턴"""
@@ -28,6 +29,8 @@ def create_app(config_class=Config):
     from routes.report_routes import report_bp
     from routes.feature_analysis_routes import feature_analysis_bp
     from routes.auto_discovery_routes import auto_discovery_bp
+    from routes.ai_analysis_routes import ai_analysis_bp
+    from routes.advanced_crawling_routes import advanced_crawling_bp
     
     app.register_blueprint(project_bp, url_prefix='/api/projects')
     app.register_blueprint(keyword_bp, url_prefix='/api/keywords')
@@ -35,6 +38,8 @@ def create_app(config_class=Config):
     app.register_blueprint(report_bp, url_prefix='/api/reports')
     app.register_blueprint(feature_analysis_bp, url_prefix='/api/feature-analysis')
     app.register_blueprint(auto_discovery_bp, url_prefix='/api/auto-discovery')
+    app.register_blueprint(ai_analysis_bp, url_prefix='/api/ai')
+    app.register_blueprint(advanced_crawling_bp)
     
     # 헬스체크 엔드포인트
     @app.route('/api/health')

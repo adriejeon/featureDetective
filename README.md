@@ -1,192 +1,227 @@
-# Feature Detective 🔍
+# Feature Detective
 
-웹 크롤링을 통한 경쟁사 기능 분석 및 리포트 생성 도구
+경쟁사 제품의 기능 분석을 위한 웹 크롤링 및 분석 도구입니다.
 
-## 📋 프로젝트 개요
+## 주요 기능
 
-Feature Detective는 웹사이트를 크롤링하여 특정 기능의 지원 여부를 자동으로 분석하고, 경쟁사 비교 리포트를 생성하는 도구입니다. 키워드 기반의 NLP 분석을 통해 O/X/△ 판별을 수행하며, PDF 및 CSV 형태의 상세한 리포트를 제공합니다.
+### 🔍 고급 웹 크롤링 (Intercom 스타일)
+- **링크 기반 탐색**: 입력된 URL을 시작점으로 하이퍼링크를 따라 자동 페이지 탐색
+- **URL Globs 지원**: 와일드카드를 사용한 URL 패턴 매칭 (`*/help/*`, `*/docs/*` 등)
+- **CSS 선택자 제어**: 불필요한 요소 제외 및 숨겨진 콘텐츠 클릭/대기 설정
+- **XML Sitemap 활용**: robots.txt 및 sitemap.xml을 통한 빠른 페이지 발견
+- **하위 도메인 탐색**: 같은 도메인의 하위 도메인 자동 탐색
+- **사전 정의된 템플릿**: 헬프 센터, 문서 사이트, 이커머스 등 특화된 설정
+- **스마트 콘텐츠 추출**: 네비게이션, 광고, 스크립트 등을 제거하고 깨끗한 텍스트 추출
+- **속도 제한 및 재시도**: 서버 부하를 고려한 정중한 크롤링
 
-## ✨ 주요 기능
+### 🤖 AI 기반 분석
+- **Vertex AI Gemini 통합**: 크롤링된 콘텐츠의 의미 분석
+- **제품 기능 자동 식별**: AI가 제품 기능을 자동으로 추출
+- **스마트 키워드 분석**: AI 기반 키워드 지원 여부 분석
+- **제품 비교 분석**: 두 제품의 기능을 의미론적으로 비교
+- **경쟁 분석 리포트**: 자동으로 경쟁 분석 리포트 생성
 
-- **📁 프로젝트 관리**: 경쟁사 분석 프로젝트 생성 및 관리
-- **🔑 키워드 관리**: CSV 업로드/다운로드 지원
-- **🕷️ 웹 크롤링**: Beautiful Soup 기반 스마트 크롤링
-- **🤖 AI 분석**: NLP 기반 기능 지원 여부 판별 (O/X/△)
-- **📊 시각화**: 경쟁사별 기능 매트릭스 및 차트
-- **📄 리포트 생성**: PDF/CSV 형태의 상세 분석 리포트
-- **⚡ 비동기 처리**: Celery 기반 백그라운드 작업
+### 📊 키워드 기반 분석
+- **키워드 매칭**: 사용자 정의 키워드로 기능 지원 여부 분석
+- **신뢰도 점수**: 각 기능의 지원 확률을 점수로 제공
+- **매칭된 텍스트**: 어떤 텍스트에서 키워드가 발견되었는지 표시
 
-## 🏗️ 기술 스택
+### 📈 리포트 생성
+- **PDF 리포트**: 상세한 분석 결과를 PDF로 생성
+- **CSV 내보내기**: 데이터 분석을 위한 CSV 형식 지원
+- **실시간 통계**: 크롤링 진행 상황 및 분석 통계
+
+## 기술 스택
 
 ### Backend
-
-- **Flask**: Python 웹 프레임워크
-- **PostgreSQL**: 메인 데이터베이스
-- **Redis**: 메시지 브로커 및 캐싱
-- **Celery**: 비동기 작업 처리
-- **Beautiful Soup**: 웹 스크래핑
+- **Flask**: 웹 프레임워크
 - **SQLAlchemy**: ORM
+- **Celery**: 비동기 작업 처리
+- **Redis**: 메시지 브로커
+- **BeautifulSoup4**: HTML 파싱
+- **readability-lxml**: 콘텐츠 추출
+- **fake-useragent**: User-Agent 랜덤화
+- **Google GenAI**: Vertex AI Gemini 통합
 
 ### Frontend
-
 - **React**: 사용자 인터페이스
 - **TypeScript**: 타입 안전성
-- **Material-UI**: UI 컴포넌트 라이브러리
-- **Axios**: HTTP 클라이언트
+- **Material-UI**: UI 컴포넌트
 
-### DevOps
+## 설치 및 실행
 
-- **Docker**: 컨테이너화
-- **Docker Compose**: 멀티 컨테이너 오케스트레이션
-
-## 🚀 빠른 시작
-
-### 사전 요구사항
-
-- Docker & Docker Compose
-- Git
-
-### 설치 및 실행
-
-1. **저장소 클론**
-
-   ```bash
-   git clone <repository-url>
-   cd featureDetective
-   ```
-
-2. **환경 변수 설정**
-
-   ```bash
-   cp env.example .env
-   # .env 파일을 편집하여 필요한 설정값 입력
-   ```
-
-3. **Docker Compose로 실행**
-
-   ```bash
-   docker-compose up -d
-   ```
-
-4. **애플리케이션 접속**
-   - Frontend: http://localhost:3000
-   - Backend API: http://localhost:5000
-
-## 📁 프로젝트 구조
-
-```
-featureDetective/
-├── backend/                 # Flask 백엔드
-│   ├── app.py              # 메인 애플리케이션
-│   ├── config.py           # 설정 관리
-│   ├── models/             # 데이터베이스 모델
-│   ├── routes/             # API 엔드포인트
-│   ├── services/           # 비즈니스 로직
-│   ├── tasks/              # Celery 태스크
-│   └── requirements.txt    # Python 의존성
-├── frontend/               # React 프론트엔드
-│   ├── src/
-│   │   ├── components/     # UI 컴포넌트
-│   │   ├── pages/          # 페이지
-│   │   ├── services/       # API 클라이언트
-│   │   └── contexts/       # React Context
-│   └── package.json        # Node 의존성
-├── celeryconfig.py         # Celery 설정
-├── docker-compose.yml      # Docker Compose 설정
-└── README.md
+### 1. 저장소 클론
+```bash
+git clone https://github.com/your-username/feature-detective.git
+cd feature-detective
 ```
 
-## 🔧 개발 환경 설정
-
-### 로컬 개발
-
-1. **Backend 설정**
-
-   ```bash
-   cd backend
-   python -m venv venv
-   source venv/bin/activate  # Windows: venv\Scripts\activate
-   pip install -r requirements.txt
-   python run.py
-   ```
-
-2. **Frontend 설정**
-
-   ```bash
-   cd frontend
-   npm install
-   npm start
-   ```
-
-3. **데이터베이스 설정**
-   ```bash
-   # PostgreSQL 및 Redis 실행
-   docker-compose up postgres redis -d
-   ```
-
-## 📚 API 문서
-
-### 프로젝트 관리
-
-- `GET /api/projects` - 프로젝트 목록 조회
-- `POST /api/projects` - 프로젝트 생성
-- `GET /api/projects/{id}` - 프로젝트 상세 조회
-- `PUT /api/projects/{id}` - 프로젝트 수정
-- `DELETE /api/projects/{id}` - 프로젝트 삭제
-
-### 키워드 관리
-
-- `GET /api/projects/{id}/keywords` - 키워드 목록 조회
-- `POST /api/projects/{id}/keywords` - 키워드 추가
-- `PUT /api/keywords/{id}` - 키워드 수정
-- `DELETE /api/keywords/{id}` - 키워드 삭제
-- `POST /api/projects/{id}/keywords/upload` - CSV 업로드
-
-### 크롤링
-
-- `POST /api/projects/{id}/crawl` - 크롤링 시작
-- `GET /api/projects/{id}/crawl/status` - 크롤링 상태 조회
-- `GET /api/projects/{id}/results` - 크롤링 결과 조회
-
-### 리포트
-
-- `GET /api/projects/{id}/report/pdf` - PDF 리포트 생성
-- `GET /api/projects/{id}/report/csv` - CSV 리포트 생성
-
-## 🧪 테스트
-
-### Backend 테스트
-
+### 2. Backend 설정
 ```bash
 cd backend
-python -m pytest
+python3 -m venv venv
+source venv/bin/activate  # Windows: venv\Scripts\activate
+pip install -r requirements.txt
 ```
 
-### Frontend 테스트
-
+### 3. 환경 변수 설정
 ```bash
-cd frontend
-npm test
+cp env.example .env
+# .env 파일을 편집하여 데이터베이스 및 기타 설정을 구성
 ```
 
-## 📦 배포
-
-### Docker 배포
-
+### 4. 데이터베이스 초기화
 ```bash
-docker-compose -f docker-compose.prod.yml up -d
+flask db upgrade
 ```
 
-### 환경 변수
+### 5. Backend 실행
+```bash
+# 개발 서버
+python run.py
 
-프로덕션 환경에서는 다음 환경 변수를 설정하세요:
+# 또는 Celery 워커 (별도 터미널에서)
+celery -A tasks.crawling_tasks worker --loglevel=info
+```
 
-- `DATABASE_URL`: PostgreSQL 연결 문자열
-- `REDIS_URL`: Redis 연결 문자열
-- `SECRET_KEY`: Flask 시크릿 키
-- `CELERY_BROKER_URL`: Celery 브로커 URL
+### 6. Frontend 설정
+```bash
+cd ../frontend
+npm install
+npm start
+```
 
-## 🤝 기여하기
+## 사용법
+
+### 1. 프로젝트 생성
+- 웹 인터페이스에서 새 프로젝트를 생성
+- 프로젝트명과 설명을 입력
+
+### 2. 키워드 추가
+- 분석하고 싶은 기능들을 키워드로 추가
+- 예: "API 통합", "실시간 알림", "모바일 앱" 등
+
+### 3. 크롤링 시작
+- **단일 URL 크롤링**: 특정 도움말 페이지 URL 입력
+- **고급 사이트 크롤링**: Intercom 스타일의 자동 사이트 탐색
+  - 헬프 센터 전용 크롤링
+  - 문서 사이트 전용 크롤링
+  - 사용자 정의 설정 크롤링 (URL 패턴, CSS 선택자 등)
+- **배치 크롤링**: 여러 URL을 한 번에 크롤링
+
+### 4. AI 분석 수행
+- **자동 기능 추출**: 크롤링 완료 후 AI가 자동으로 제품 기능 추출
+- **스마트 키워드 분석**: AI 기반 키워드 지원 여부 분석
+- **제품 비교 분석**: 두 제품의 기능을 의미론적으로 비교
+
+### 5. 분석 결과 확인
+- 추출된 기능 목록 및 카테고리별 분류 확인
+- 각 키워드별 AI 분석 결과 및 신뢰도 점수 확인
+- 제품 비교 분석 결과 및 경쟁 우위 분석
+
+### 6. 리포트 생성
+- PDF 또는 CSV 형식으로 분석 결과 다운로드
+- 프로젝트별 통계 및 요약 정보 확인
+
+## 크롤링 모듈 구조
+
+```
+backend/
+├── crawlers/
+│   ├── __init__.py
+│   ├── base_crawler.py              # 추상 기본 크롤러
+│   ├── help_doc_crawler.py          # 도움말 문서 전용 크롤러
+│   ├── advanced_site_crawler.py     # 고급 사이트 크롤러 (Intercom 스타일)
+│   ├── robust_crawler.py            # 강화된 웹 크롤러
+│   └── content_extractor.py         # 콘텐츠 추출기
+├── services/
+│   ├── crawling_service.py          # 기본 크롤링 서비스
+│   └── advanced_crawling_service.py # 고급 크롤링 서비스
+└── utils/
+    ├── __init__.py
+    └── rate_limiter.py              # 요청 속도 제한
+```
+
+### 주요 클래스
+
+#### BaseCrawler
+- 모든 크롤러의 기본 클래스
+- 요청 속도 제한, 재시도 로직, 에러 처리
+- 세션 관리 및 User-Agent 랜덤화
+
+#### HelpDocCrawler
+- 도움말 문서에 특화된 크롤러
+- 도움말 URL 패턴 자동 감지
+- 사이트 전체 크롤링 지원
+- 사이트맵 크롤링 지원
+
+#### AdvancedSiteCrawler (Intercom 스타일)
+- 링크 기반 탐색으로 사이트 전체 자동 크롤링
+- URL Globs 패턴 매칭 지원
+- CSS 선택자를 통한 요소 제어
+- XML Sitemap 자동 감지 및 활용
+- 하위 도메인 탐색 지원
+- 사전 정의된 템플릿 (헬프 센터, 문서 사이트, 이커머스)
+
+#### ContentExtractor
+- HTML에서 깨끗한 텍스트 추출
+- 네비게이션, 광고, 스크립트 제거
+- 메인 콘텐츠 영역 자동 감지
+- 메타데이터 추출 (제목, 헤딩, 링크 등)
+
+## API 엔드포인트
+
+### 크롤링 API
+- `POST /api/crawling/projects/{id}/crawl` - URL 목록 크롤링
+- `POST /api/crawling/projects/{id}/crawl/site` - 사이트 전체 크롤링
+- `GET /api/crawling/projects/{id}/crawl/status` - 크롤링 상태 조회
+- `GET /api/crawling/projects/{id}/crawl/stats` - 크롤링 통계
+- `GET /api/crawling/projects/{id}/results` - 크롤링 결과 조회
+
+### 고급 크롤링 API (Intercom 스타일)
+- `POST /api/advanced-crawling/crawl-site` - 고급 사이트 크롤링
+- `POST /api/advanced-crawling/crawl-help-center` - 헬프 센터 전용 크롤링
+- `POST /api/advanced-crawling/crawl-documentation` - 문서 사이트 전용 크롤링
+- `POST /api/advanced-crawling/crawl-custom` - 사용자 정의 설정 크롤링
+- `GET /api/advanced-crawling/status/{project_id}` - 크롤링 상태 조회
+- `POST /api/advanced-crawling/export/{project_id}` - 결과 내보내기
+- `GET /api/advanced-crawling/config/templates` - 설정 템플릿 조회
+
+### AI 분석 API
+- `POST /api/ai/projects/{id}/analyze` - AI 기능 추출 분석
+- `POST /api/ai/projects/{id}/analyze/batch` - 배치 AI 분석
+- `GET /api/ai/projects/{id}/features` - 추출된 기능 목록
+- `POST /api/ai/projects/{id}/analyze-keyword` - AI 키워드 분석
+- `POST /api/ai/projects/{id}/compare-products` - 제품 비교 분석
+- `GET /api/ai/status` - AI 서비스 상태 확인
+
+자세한 API 문서는 [API_ENDPOINTS.md](backend/API_ENDPOINTS.md)를 참조하세요.
+
+## 개발 가이드
+
+### 크롤링 모듈 테스트
+```bash
+cd backend
+python3 test_crawler.py
+python3 test_advanced_crawler_simple.py  # 고급 크롤러 테스트
+```
+
+### 새로운 크롤러 추가
+1. `BaseCrawler`를 상속받는 새 클래스 생성
+2. `crawl()` 및 `crawl_multiple()` 메서드 구현
+3. 필요한 경우 `ContentExtractor` 커스터마이징
+
+### 데이터베이스 마이그레이션
+```bash
+flask db migrate -m "마이그레이션 설명"
+flask db upgrade
+```
+
+## 라이선스
+
+MIT License
+
+## 기여하기
 
 1. Fork the Project
 2. Create your Feature Branch (`git checkout -b feature/AmazingFeature`)
@@ -194,25 +229,14 @@ docker-compose -f docker-compose.prod.yml up -d
 4. Push to the Branch (`git push origin feature/AmazingFeature`)
 5. Open a Pull Request
 
-## 📄 라이선스
+## 로드맵
 
-이 프로젝트는 MIT 라이선스 하에 배포됩니다. 자세한 내용은 `LICENSE` 파일을 참조하세요.
-
-## 📞 지원
-
-- **이슈 리포트**: [GitHub Issues](https://github.com/your-repo/issues)
-- **문서**: [Wiki](https://github.com/your-repo/wiki)
-- **이메일**: support@featuredetective.com
-
-## 🗺️ 로드맵
-
-- [ ] 실시간 크롤링 진행률 표시
-- [ ] 고급 필터링 및 검색 기능
-- [ ] 팀 협업 기능
-- [ ] API 레이트 리미팅
-- [ ] 모바일 앱 지원
+- [x] Vertex AI Gemini 통합
+- [x] 자동 기능 식별
+- [x] AI 기반 키워드 분석
+- [x] 제품 비교 분석
+- [ ] 경쟁 분석 리포트 자동 생성
 - [ ] 다국어 지원
-
----
-
-**Feature Detective** - 경쟁사 분석을 더욱 스마트하게! 🚀
+- [ ] 고급 필터링 및 검색
+- [ ] 실시간 알림
+- [ ] API 사용량 모니터링

@@ -15,6 +15,10 @@ import {
   TableContainer,
   TableHead,
   TableRow,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
 } from "@mui/material";
 import {
   PlayArrow as PlayIcon,
@@ -26,6 +30,10 @@ interface AnalysisResult {
   feature: string;
   competitor: "O" | "X" | "△";
   ourProduct: "O" | "X" | "△";
+  competitorDescription?: string;
+  ourProductDescription?: string;
+  competitorLink?: string;
+  ourProductLink?: string;
 }
 
 const CrawlingPage: React.FC = () => {
@@ -40,6 +48,8 @@ const CrawlingPage: React.FC = () => {
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState("");
   const [results, setResults] = React.useState<AnalysisResult[]>([]);
+  const [selectedResult, setSelectedResult] = React.useState<AnalysisResult | null>(null);
+  const [detailModalOpen, setDetailModalOpen] = React.useState(false);
 
   const handleAnalyze = async () => {
     setError("");
@@ -66,7 +76,7 @@ const CrawlingPage: React.FC = () => {
           .filter((f) => f);
 
         const response = await fetch(
-          "http://127.0.0.1:5001/api/feature-analysis/analyze",
+          "http://127.0.0.1:5002/api/feature-analysis/analyze",
           {
             method: "POST",
             headers: {
@@ -87,15 +97,20 @@ const CrawlingPage: React.FC = () => {
             feature: result.feature,
             competitor: result.competitor.status,
             ourProduct: result.our_product.status,
+            competitorDescription: result.competitor.text,
+            ourProductDescription: result.our_product.text,
+            competitorLink: competitorUrl,
+            ourProductLink: ourProductUrl,
           }));
         } else {
           setError(data.error || "분석 중 오류가 발생했습니다.");
           return;
         }
       } else {
-        // 자동 발견 모드
+        // 자동 발견 모드 (실제 크롤링 API 사용)
+        console.log("자동 기능 발견 모드 시작");
         const response = await fetch(
-          "http://127.0.0.1:5001/api/auto-discovery/discover",
+          "http://127.0.0.1:5002/api/auto-discovery/discover",
           {
             method: "POST",
             headers: {
@@ -109,13 +124,49 @@ const CrawlingPage: React.FC = () => {
         );
 
         const data = await response.json();
+        console.log("자동 발견 API 응답:", data); // 디버깅용
 
         if (data.success) {
-          apiResults = data.data.results.map((result: any) => ({
-            feature: result.feature_name,
-            competitor: result.competitor.status,
-            ourProduct: result.our_product.status,
-          }));
+          console.log("API 응답 데이터:", data); // 디버깅용
+          
+          // 새로운 Vertex AI 분석 결과 처리
+          if (data.data.analysis_method === 'new_vertex_ai') {
+            console.log("새로운 Vertex AI 분석 결과 처리");
+            console.log("결과 데이터:", data.data.results);
+            
+            if (data.data.results && Array.isArray(data.data.results)) {
+              apiResults = data.data.results.map((result: any) => ({
+                feature: result.feature_name,
+                competitor: result.competitor?.status || 'X',
+                ourProduct: result.our_product?.status || 'X',
+                competitorDescription: result.competitor?.text || '기능 정보 없음',
+                ourProductDescription: result.our_product?.text || '기능 정보 없음',
+                competitorLink: result.competitor?.url || competitorUrl,
+                ourProductLink: result.our_product?.url || ourProductUrl,
+              }));
+            } else {
+              console.log("결과 데이터가 배열이 아님:", data.data.results);
+              apiResults = [];
+            }
+          } else {
+            // 기존 형식 결과 처리
+            if (data.data.results && Array.isArray(data.data.results)) {
+              apiResults = data.data.results.map((result: any) => ({
+                feature: result.feature_name,
+                competitor: result.competitor?.status || 'X',
+                ourProduct: result.our_product?.status || 'X',
+                competitorDescription: result.competitor?.text || '기능 정보 없음',
+                ourProductDescription: result.our_product?.text || '기능 정보 없음',
+                competitorLink: result.competitor?.url || competitorUrl,
+                ourProductLink: result.our_product?.url || ourProductUrl,
+              }));
+            } else {
+              console.log("기존 형식 결과 데이터가 배열이 아님:", data.data.results);
+              apiResults = [];
+            }
+          }
+          
+          console.log("처리된 결과:", apiResults); // 디버깅용
         } else {
           setError(data.error || "자동 기능 발견 중 오류가 발생했습니다.");
           return;
@@ -292,8 +343,13 @@ const CrawlingPage: React.FC = () => {
         <Card>
           <CardContent>
             <Typography variant="h6" gutterBottom>
-              분석 결과
+              분석 결과 ({results.length}개 기능)
             </Typography>
+            
+            {/* 분석 방법 표시 */}
+            <Alert severity="info" sx={{ mb: 2 }}>
+              {features.trim() ? "수동 기능 분석" : "자동 기능 발견 (Vertex AI)"} 모드로 분석되었습니다.
+            </Alert>
             <TableContainer component={Paper}>
               <Table>
                 <TableHead>
@@ -305,47 +361,117 @@ const CrawlingPage: React.FC = () => {
                     <TableCell align="center">
                       {ourProductName || "우리 제품"}
                     </TableCell>
+                    <TableCell align="center">상세 정보</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
                   {results.map((result, index) => (
-                    <TableRow key={index}>
-                      <TableCell component="th" scope="row">
-                        {result.feature}
-                      </TableCell>
-                      <TableCell align="center">
-                        <Box
-                          sx={{
-                            color:
-                              getStatusColor(result.competitor) === "success"
-                                ? "green"
-                                : getStatusColor(result.competitor) === "error"
-                                ? "red"
-                                : "orange",
-                            fontWeight: "bold",
-                          }}
-                        >
-                          {result.competitor} (
-                          {getStatusText(result.competitor)})
-                        </Box>
-                      </TableCell>
-                      <TableCell align="center">
-                        <Box
-                          sx={{
-                            color:
-                              getStatusColor(result.ourProduct) === "success"
-                                ? "green"
-                                : getStatusColor(result.ourProduct) === "error"
-                                ? "red"
-                                : "orange",
-                            fontWeight: "bold",
-                          }}
-                        >
-                          {result.ourProduct} (
-                          {getStatusText(result.ourProduct)})
-                        </Box>
-                      </TableCell>
-                    </TableRow>
+                    <React.Fragment key={index}>
+                      <TableRow>
+                        <TableCell component="th" scope="row">
+                          <Typography variant="subtitle1" fontWeight="bold">
+                            {result.feature}
+                          </Typography>
+                        </TableCell>
+                        <TableCell align="center">
+                          <Box
+                            sx={{
+                              color:
+                                getStatusColor(result.competitor) === "success"
+                                  ? "green"
+                                  : getStatusColor(result.competitor) === "error"
+                                  ? "red"
+                                  : "orange",
+                              fontWeight: "bold",
+                            }}
+                          >
+                            {result.competitor} (
+                            {getStatusText(result.competitor)})
+                          </Box>
+                        </TableCell>
+                        <TableCell align="center">
+                          <Box
+                            sx={{
+                              color:
+                                getStatusColor(result.ourProduct) === "success"
+                                  ? "green"
+                                  : getStatusColor(result.ourProduct) === "error"
+                                  ? "red"
+                                  : "orange",
+                              fontWeight: "bold",
+                            }}
+                          >
+                            {result.ourProduct} (
+                            {getStatusText(result.ourProduct)})
+                          </Box>
+                        </TableCell>
+                        <TableCell align="center">
+                          <Button
+                            size="small"
+                            variant="outlined"
+                            onClick={() => {
+                              setSelectedResult(result);
+                              setDetailModalOpen(true);
+                            }}
+                          >
+                            상세보기
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                      <TableRow>
+                        <TableCell colSpan={4} sx={{ py: 2 }}>
+                          <Box sx={{ pl: 2 }}>
+                            <Box sx={{ display: "flex", gap: 2, mb: 1 }}>
+                              <Typography variant="body2" color="text.secondary" sx={{ minWidth: 80 }}>
+                                경쟁사:
+                              </Typography>
+                              <Typography variant="body2" sx={{ flex: 1 }}>
+                                {result.competitorDescription || "설명 없음"}
+                              </Typography>
+                            </Box>
+                            <Box sx={{ display: "flex", gap: 2, mb: 1 }}>
+                              <Typography variant="body2" color="text.secondary" sx={{ minWidth: 80 }}>
+                                우리 제품:
+                              </Typography>
+                              <Typography variant="body2" sx={{ flex: 1 }}>
+                                {result.ourProductDescription || "설명 없음"}
+                              </Typography>
+                            </Box>
+                            <Box sx={{ display: "flex", gap: 2, mt: 1 }}>
+                              <Typography variant="body2" color="text.secondary" sx={{ minWidth: 80 }}>
+                                링크:
+                              </Typography>
+                              <Box sx={{ display: "flex", gap: 1 }}>
+                                {result.competitorLink && (
+                                  <Button
+                                    size="small"
+                                    variant="outlined"
+                                    href={result.competitorLink}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    sx={{ fontSize: '0.75rem' }}
+                                  >
+                                    경쟁사 도움말
+                                  </Button>
+                                )}
+                                {result.ourProductLink && (
+                                  <Button
+                                    size="small"
+                                    variant="outlined"
+                                    href={result.ourProductLink}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    sx={{ fontSize: '0.75rem' }}
+                                  >
+                                    우리 제품 도움말
+                                  </Button>
+                                )}
+                              </Box>
+                            </Box>
+                          </Box>
+                        </TableCell>
+                      </TableRow>
+                    </React.Fragment>
                   ))}
                 </TableBody>
               </Table>
@@ -361,7 +487,109 @@ const CrawlingPage: React.FC = () => {
         >
           프로젝트 상세로 돌아가기
         </Button>
+        <Button
+          variant="contained"
+          onClick={() => navigate(`/projects/${projectId}/advanced-crawling`)}
+        >
+          고급 크롤링으로 이동
+        </Button>
       </Box>
+
+      {/* 상세보기 모달 */}
+      <Dialog
+        open={detailModalOpen}
+        onClose={() => setDetailModalOpen(false)}
+        maxWidth="md"
+        fullWidth
+      >
+        <DialogTitle>
+          기능 상세 분석: {selectedResult?.feature}
+        </DialogTitle>
+        <DialogContent>
+          {selectedResult && (
+            <Box sx={{ mt: 2 }}>
+              <Box sx={{ mb: 3 }}>
+                <Typography variant="h6" gutterBottom>
+                  경쟁사 분석
+                </Typography>
+                <Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
+                  <Typography variant="body1" sx={{ mr: 2 }}>
+                    지원 상태:
+                  </Typography>
+                  <Box
+                    sx={{
+                      color:
+                        getStatusColor(selectedResult.competitor) === "success"
+                          ? "green"
+                          : getStatusColor(selectedResult.competitor) === "error"
+                          ? "red"
+                          : "orange",
+                      fontWeight: "bold",
+                    }}
+                  >
+                    {selectedResult.competitor} ({getStatusText(selectedResult.competitor)})
+                  </Box>
+                </Box>
+                <Typography variant="body2" sx={{ mb: 2 }}>
+                  {selectedResult.competitorDescription || "설명 없음"}
+                </Typography>
+                {selectedResult.competitorLink && (
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    href={selectedResult.competitorLink}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    경쟁사 도움말 보기
+                  </Button>
+                )}
+              </Box>
+
+              <Box sx={{ mb: 3 }}>
+                <Typography variant="h6" gutterBottom>
+                  우리 제품 분석
+                </Typography>
+                <Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
+                  <Typography variant="body1" sx={{ mr: 2 }}>
+                    지원 상태:
+                  </Typography>
+                  <Box
+                    sx={{
+                      color:
+                        getStatusColor(selectedResult.ourProduct) === "success"
+                          ? "green"
+                          : getStatusColor(selectedResult.ourProduct) === "error"
+                          ? "red"
+                          : "orange",
+                      fontWeight: "bold",
+                    }}
+                  >
+                    {selectedResult.ourProduct} ({getStatusText(selectedResult.ourProduct)})
+                  </Box>
+                </Box>
+                <Typography variant="body2" sx={{ mb: 2 }}>
+                  {selectedResult.ourProductDescription || "설명 없음"}
+                </Typography>
+                {selectedResult.ourProductLink && (
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    href={selectedResult.ourProductLink}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    우리 제품 도움말 보기
+                  </Button>
+                )}
+              </Box>
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDetailModalOpen(false)}>닫기</Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 };
