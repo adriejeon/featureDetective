@@ -48,3 +48,4 @@ if __name__ == "__main__":
         print("\n🎉 NLTK 데이터 문제 해결 완료!")
     else:
         print("\n💥 NLTK 데이터 문제 해결 실패!")
+

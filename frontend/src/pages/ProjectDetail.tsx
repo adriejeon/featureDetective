@@ -64,12 +64,7 @@ const ProjectDetail: React.FC = () => {
             >
               기본 크롤링
             </Button>
-            <Button
-              variant="contained"
-              onClick={() => navigate(`/projects/${id}/advanced-crawling`)}
-            >
-              고급 크롤링 (Intercom 스타일)
-            </Button>
+
             <Button
               variant="outlined"
               onClick={() => navigate(`/projects/${id}/report`)}

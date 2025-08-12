@@ -2,7 +2,7 @@
   "id": "uxbaae7IjNh0nq6",
   "unique_key": "https://guide.allganize.ai/alli/alli",
   "order_no": null,
-  "handled_at": "2025-08-12 04:17:33.925146+00:00",
+  "handled_at": "2025-08-12 06:01:24.566353+00:00",
   "request": {
     "url": "https://guide.allganize.ai/alli/alli/",
     "method": "GET",
@@ -16,7 +16,7 @@
     "retry_count": 3,
     "no_retry": false,
     "loaded_url": "https://guide.allganize.ai/alli/alli/",
-    "handled_at": "2025-08-12 04:17:33.925146+00:00",
+    "handled_at": "2025-08-12 06:01:24.566353+00:00",
     "unique_key": "https://guide.allganize.ai/alli/alli",
     "id": "uxbaae7IjNh0nq6"
   }

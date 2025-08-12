@@ -9,7 +9,7 @@ import ProjectList from "./pages/ProjectList";
 import ProjectDetail from "./pages/ProjectDetail";
 import KeywordManagement from "./pages/KeywordManagement";
 import CrawlingPage from "./pages/CrawlingPage";
-import AdvancedCrawlingPage from "./pages/AdvancedCrawlingPage";
+
 import NewProject from "./pages/NewProject";
 
 // Material-UI 테마 설정
@@ -53,7 +53,7 @@ function App() {
                 element={<KeywordManagement />}
               />
               <Route path="/projects/:id/crawling" element={<CrawlingPage />} />
-              <Route path="/projects/:id/advanced-crawling" element={<AdvancedCrawlingPage />} />
+
             </Routes>
           </Container>
         </Box>

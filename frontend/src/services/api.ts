@@ -136,68 +136,25 @@ export const crawlingAPI = {
     apiClient.delete(`/crawling/results/${resultId}`),
 };
 
-// 고급 크롤링 API
-export const advancedCrawlingAPI = {
-  // 고급 사이트 크롤링
-  crawlSiteAdvanced: (projectId: number, baseUrl: string, config?: any) =>
-    apiClient.post('/advanced-crawling/crawl-site', {
-      project_id: projectId,
-      base_url: baseUrl,
-      config
+
+
+// 자동 기능 발견 API
+export const autoDiscoveryAPI = {
+  // 자동 기능 발견
+  discoverFeatures: (competitorUrl: string, ourProductUrl: string) =>
+    apiClient.post('/auto-discovery/discover', {
+      competitor_url: competitorUrl,
+      our_product_url: ourProductUrl
     }),
 
-              // 헬프 센터 크롤링
-            crawlHelpCenter: (projectId: number, baseUrl: string) => {
-              const requestData = {
-                project_id: projectId,
-                base_url: baseUrl
-              };
-              console.log("헬프 센터 크롤링 API 요청 데이터:", requestData);
-              console.log("요청 데이터 JSON:", JSON.stringify(requestData));
-              console.log("projectId 타입:", typeof projectId);
-              console.log("baseUrl 타입:", typeof baseUrl);
-              return apiClient.post('/advanced-crawling/crawl-help-center', requestData);
-            },
-
-  // 문서 사이트 크롤링
-  crawlDocumentation: (projectId: number, baseUrl: string) =>
-    apiClient.post('/advanced-crawling/crawl-documentation', {
-      project_id: projectId,
-      base_url: baseUrl
+  // 크롤링 결과 조회
+  getCrawlingResults: (competitorUrl: string, ourProductUrl: string) =>
+    apiClient.post('/auto-discovery/crawling-results', {
+      competitor_url: competitorUrl,
+      our_product_url: ourProductUrl
     }),
 
-  // 사용자 정의 설정으로 크롤링
-  crawlWithCustomSettings: (
-    projectId: number, 
-    baseUrl: string, 
-    settings: {
-      include_patterns?: string[];
-      exclude_patterns?: string[];
-      css_exclude_selectors?: string[];
-      max_pages?: number;
-      max_depth?: number;
-    }
-  ) =>
-    apiClient.post('/advanced-crawling/crawl-custom', {
-      project_id: projectId,
-      base_url: baseUrl,
-      ...settings
-    }),
 
-  // 크롤링 상태 조회
-  getAdvancedCrawlingStatus: (projectId: number) =>
-    apiClient.get(`/advanced-crawling/status/${projectId}`),
-
-  // 크롤링 결과 내보내기
-  exportCrawlResults: (projectId: number, format: 'json' | 'csv', filepath?: string) =>
-    apiClient.post(`/advanced-crawling/export/${projectId}`, {
-      format,
-      filepath
-    }),
-
-  // 크롤링 설정 템플릿 조회
-  getConfigTemplates: () =>
-    apiClient.get('/advanced-crawling/config/templates'),
 };
 
 // 리포트 API

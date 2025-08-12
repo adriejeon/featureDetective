@@ -320,3 +320,4 @@ class RobustWebCrawler:
         except Exception as e:
             logger.error(f"크롤링 실패: {e}")
             return []
+

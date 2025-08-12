@@ -19,12 +19,20 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
+  Tabs,
+  Tab,
+  Accordion,
+  AccordionSummary,
+  AccordionDetails,
+  Chip,
 } from "@mui/material";
 import {
   PlayArrow as PlayIcon,
-  Refresh as RefreshIcon,
+  ExpandMore as ExpandMoreIcon,
+  Visibility as VisibilityIcon,
 } from "@mui/icons-material";
 import { useParams, useNavigate } from "react-router-dom";
+import { autoDiscoveryAPI } from "../services/api";
 
 interface AnalysisResult {
   feature: string;
@@ -34,6 +42,24 @@ interface AnalysisResult {
   ourProductDescription?: string;
   competitorLink?: string;
   ourProductLink?: string;
+}
+
+interface CrawlingFeature {
+  title: string;
+  content: string;
+  url: string;
+  source_page_title?: string;
+  category?: string;
+  granularity?: string;
+}
+
+interface CrawlingResults {
+  competitor_features: CrawlingFeature[];
+  our_product_features: CrawlingFeature[];
+  competitor_features_count: number;
+  our_product_features_count: number;
+  crawling_status: string;
+  timestamp: string;
 }
 
 const CrawlingPage: React.FC = () => {
@@ -50,6 +76,10 @@ const CrawlingPage: React.FC = () => {
   const [results, setResults] = React.useState<AnalysisResult[]>([]);
   const [selectedResult, setSelectedResult] = React.useState<AnalysisResult | null>(null);
   const [detailModalOpen, setDetailModalOpen] = React.useState(false);
+  const [crawlingResults, setCrawlingResults] = React.useState<CrawlingResults | null>(null);
+  const [activeTab, setActiveTab] = React.useState(0);
+  const [loadingCrawlingResults, setLoadingCrawlingResults] = React.useState(false);
+
 
   const handleAnalyze = async () => {
     setError("");
@@ -76,7 +106,7 @@ const CrawlingPage: React.FC = () => {
           .filter((f) => f);
 
         const response = await fetch(
-          "http://127.0.0.1:5002/api/feature-analysis/analyze",
+          "http://127.0.0.1:5003/api/feature-analysis/analyze",
           {
             method: "POST",
             headers: {
@@ -110,7 +140,7 @@ const CrawlingPage: React.FC = () => {
         // 자동 발견 모드 (실제 크롤링 API 사용)
         console.log("자동 기능 발견 모드 시작");
         const response = await fetch(
-          "http://127.0.0.1:5002/api/auto-discovery/discover",
+          "http://127.0.0.1:5003/api/auto-discovery/discover",
           {
             method: "POST",
             headers: {
@@ -182,6 +212,35 @@ const CrawlingPage: React.FC = () => {
     }
   };
 
+  const handleGetCrawlingResults = async () => {
+    if (!competitorUrl.trim() || !ourProductUrl.trim()) {
+      setError("URL을 먼저 입력해주세요.");
+      return;
+    }
+
+    setLoadingCrawlingResults(true);
+    try {
+      const response = await autoDiscoveryAPI.getCrawlingResults(
+        competitorUrl.trim(),
+        ourProductUrl.trim()
+      );
+
+      if (response.data.success) {
+        setCrawlingResults(response.data.data);
+        setActiveTab(1); // 크롤링 결과 탭으로 이동
+      } else {
+        setError(response.data.error || "크롤링 결과 조회 중 오류가 발생했습니다.");
+      }
+    } catch (error: any) {
+      console.error("크롤링 결과 조회 오류:", error);
+      setError("크롤링 결과 조회 중 오류가 발생했습니다.");
+    } finally {
+      setLoadingCrawlingResults(false);
+    }
+  };
+
+
+
   const getStatusColor = (status: "O" | "X" | "△") => {
     switch (status) {
       case "O":
@@ -207,6 +266,8 @@ const CrawlingPage: React.FC = () => {
         return "";
     }
   };
+
+
 
   return (
     <Box>
@@ -322,14 +383,14 @@ const CrawlingPage: React.FC = () => {
         </CardContent>
       </Card>
 
-      <Box sx={{ mb: 3 }}>
+      <Box sx={{ mb: 3, display: "flex", gap: 2, flexWrap: "wrap" }}>
         <Button
           variant="contained"
           size="large"
           startIcon={loading ? <CircularProgress size={20} /> : <PlayIcon />}
           onClick={handleAnalyze}
           disabled={loading}
-          fullWidth
+          sx={{ flex: 1, minWidth: 200 }}
         >
           {loading
             ? "분석 중..."
@@ -337,145 +398,313 @@ const CrawlingPage: React.FC = () => {
             ? "기능 분석 시작"
             : "자동 기능 발견 시작"}
         </Button>
+        
+        {!features.trim() && (
+          <>
+            <Button
+              variant="outlined"
+              size="large"
+              startIcon={loadingCrawlingResults ? <CircularProgress size={20} /> : <VisibilityIcon />}
+              onClick={handleGetCrawlingResults}
+              disabled={loadingCrawlingResults}
+            >
+              실제 크롤링
+            </Button>
+          </>
+        )}
       </Box>
 
-      {results.length > 0 && (
+      {/* 결과 탭 */}
+      {(results.length > 0 || crawlingResults) && (
         <Card>
           <CardContent>
-            <Typography variant="h6" gutterBottom>
-              분석 결과 ({results.length}개 기능)
-            </Typography>
-            
-            {/* 분석 방법 표시 */}
-            <Alert severity="info" sx={{ mb: 2 }}>
-              {features.trim() ? "수동 기능 분석" : "자동 기능 발견 (Vertex AI)"} 모드로 분석되었습니다.
-            </Alert>
-            <TableContainer component={Paper}>
-              <Table>
-                <TableHead>
-                  <TableRow>
-                    <TableCell>기능명</TableCell>
-                    <TableCell align="center">
-                      {competitorName || "경쟁사"}
-                    </TableCell>
-                    <TableCell align="center">
-                      {ourProductName || "우리 제품"}
-                    </TableCell>
-                    <TableCell align="center">상세 정보</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {results.map((result, index) => (
-                    <React.Fragment key={index}>
+            <Tabs value={activeTab} onChange={(e, newValue) => setActiveTab(newValue)} sx={{ mb: 2 }}>
+              {results.length > 0 && (
+                <Tab label={`분석 결과 (${results.length}개)`} />
+              )}
+              {crawlingResults && (
+                <Tab label="크롤링 결과" />
+              )}
+            </Tabs>
+
+            {/* 분석 결과 탭 */}
+            {activeTab === 0 && results.length > 0 && (
+              <Box>
+                <Alert severity="info" sx={{ mb: 2 }}>
+                  {features.trim() ? "수동 기능 분석" : "자동 기능 발견 (Vertex AI)"} 모드로 분석되었습니다.
+                </Alert>
+                <TableContainer component={Paper}>
+                  <Table>
+                    <TableHead>
                       <TableRow>
-                        <TableCell component="th" scope="row">
-                          <Typography variant="subtitle1" fontWeight="bold">
-                            {result.feature}
-                          </Typography>
+                        <TableCell>기능명</TableCell>
+                        <TableCell align="center">
+                          {competitorName || "경쟁사"}
                         </TableCell>
                         <TableCell align="center">
-                          <Box
-                            sx={{
-                              color:
-                                getStatusColor(result.competitor) === "success"
-                                  ? "green"
-                                  : getStatusColor(result.competitor) === "error"
-                                  ? "red"
-                                  : "orange",
-                              fontWeight: "bold",
-                            }}
-                          >
-                            {result.competitor} (
-                            {getStatusText(result.competitor)})
-                          </Box>
+                          {ourProductName || "우리 제품"}
                         </TableCell>
-                        <TableCell align="center">
-                          <Box
-                            sx={{
-                              color:
-                                getStatusColor(result.ourProduct) === "success"
-                                  ? "green"
-                                  : getStatusColor(result.ourProduct) === "error"
-                                  ? "red"
-                                  : "orange",
-                              fontWeight: "bold",
-                            }}
-                          >
-                            {result.ourProduct} (
-                            {getStatusText(result.ourProduct)})
-                          </Box>
-                        </TableCell>
-                        <TableCell align="center">
-                          <Button
-                            size="small"
-                            variant="outlined"
-                            onClick={() => {
-                              setSelectedResult(result);
-                              setDetailModalOpen(true);
-                            }}
-                          >
-                            상세보기
-                          </Button>
-                        </TableCell>
+                        <TableCell align="center">상세 정보</TableCell>
                       </TableRow>
-                      <TableRow>
-                        <TableCell colSpan={4} sx={{ py: 2 }}>
-                          <Box sx={{ pl: 2 }}>
-                            <Box sx={{ display: "flex", gap: 2, mb: 1 }}>
-                              <Typography variant="body2" color="text.secondary" sx={{ minWidth: 80 }}>
-                                경쟁사:
+                    </TableHead>
+                    <TableBody>
+                      {results.map((result, index) => (
+                        <React.Fragment key={index}>
+                          <TableRow>
+                            <TableCell component="th" scope="row">
+                              <Typography variant="subtitle1" fontWeight="bold">
+                                {result.feature}
                               </Typography>
-                              <Typography variant="body2" sx={{ flex: 1 }}>
-                                {result.competitorDescription || "설명 없음"}
-                              </Typography>
-                            </Box>
-                            <Box sx={{ display: "flex", gap: 2, mb: 1 }}>
-                              <Typography variant="body2" color="text.secondary" sx={{ minWidth: 80 }}>
-                                우리 제품:
-                              </Typography>
-                              <Typography variant="body2" sx={{ flex: 1 }}>
-                                {result.ourProductDescription || "설명 없음"}
-                              </Typography>
-                            </Box>
-                            <Box sx={{ display: "flex", gap: 2, mt: 1 }}>
-                              <Typography variant="body2" color="text.secondary" sx={{ minWidth: 80 }}>
-                                링크:
-                              </Typography>
-                              <Box sx={{ display: "flex", gap: 1 }}>
-                                {result.competitorLink && (
-                                  <Button
-                                    size="small"
-                                    variant="outlined"
-                                    href={result.competitorLink}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    sx={{ fontSize: '0.75rem' }}
-                                  >
-                                    경쟁사 도움말
-                                  </Button>
-                                )}
-                                {result.ourProductLink && (
-                                  <Button
-                                    size="small"
-                                    variant="outlined"
-                                    href={result.ourProductLink}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    sx={{ fontSize: '0.75rem' }}
-                                  >
-                                    우리 제품 도움말
-                                  </Button>
-                                )}
+                            </TableCell>
+                            <TableCell align="center">
+                              <Box
+                                sx={{
+                                  color:
+                                    getStatusColor(result.competitor) === "success"
+                                      ? "green"
+                                      : getStatusColor(result.competitor) === "error"
+                                      ? "red"
+                                      : "orange",
+                                  fontWeight: "bold",
+                                }}
+                              >
+                                {result.competitor} (
+                                {getStatusText(result.competitor)})
                               </Box>
-                            </Box>
-                          </Box>
-                        </TableCell>
-                      </TableRow>
-                    </React.Fragment>
+                            </TableCell>
+                            <TableCell align="center">
+                              <Box
+                                sx={{
+                                  color:
+                                    getStatusColor(result.ourProduct) === "success"
+                                      ? "green"
+                                      : getStatusColor(result.ourProduct) === "error"
+                                      ? "red"
+                                      : "orange",
+                                  fontWeight: "bold",
+                                }}
+                              >
+                                {result.ourProduct} (
+                                {getStatusText(result.ourProduct)})
+                              </Box>
+                            </TableCell>
+                            <TableCell align="center">
+                              <Button
+                                size="small"
+                                variant="outlined"
+                                onClick={() => {
+                                  setSelectedResult(result);
+                                  setDetailModalOpen(true);
+                                }}
+                              >
+                                상세보기
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                          <TableRow>
+                            <TableCell colSpan={4} sx={{ py: 2 }}>
+                              <Box sx={{ pl: 2 }}>
+                                <Box sx={{ display: "flex", gap: 2, mb: 1 }}>
+                                  <Typography variant="body2" color="text.secondary" sx={{ minWidth: 80 }}>
+                                    경쟁사:
+                                  </Typography>
+                                  <Typography variant="body2" sx={{ flex: 1 }}>
+                                    {result.competitorDescription || "설명 없음"}
+                                  </Typography>
+                                </Box>
+                                <Box sx={{ display: "flex", gap: 2, mb: 1 }}>
+                                  <Typography variant="body2" color="text.secondary" sx={{ minWidth: 80 }}>
+                                    우리 제품:
+                                  </Typography>
+                                  <Typography variant="body2" sx={{ flex: 1 }}>
+                                    {result.ourProductDescription || "설명 없음"}
+                                  </Typography>
+                                </Box>
+                                <Box sx={{ display: "flex", gap: 2, mt: 1 }}>
+                                  <Typography variant="body2" color="text.secondary" sx={{ minWidth: 80 }}>
+                                    링크:
+                                  </Typography>
+                                  <Box sx={{ display: "flex", gap: 1 }}>
+                                    {result.competitorLink && (
+                                      <Button
+                                        size="small"
+                                        variant="outlined"
+                                        href={result.competitorLink}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        sx={{ fontSize: '0.75rem' }}
+                                      >
+                                        경쟁사 도움말
+                                      </Button>
+                                    )}
+                                    {result.ourProductLink && (
+                                      <Button
+                                        size="small"
+                                        variant="outlined"
+                                        href={result.ourProductLink}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        sx={{ fontSize: '0.75rem' }}
+                                      >
+                                        우리 제품 도움말
+                                      </Button>
+                                    )}
+                                  </Box>
+                                </Box>
+                              </Box>
+                            </TableCell>
+                          </TableRow>
+                        </React.Fragment>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              </Box>
+            )}
+
+            {/* 크롤링 결과 탭 */}
+            {activeTab === 1 && crawlingResults && (
+              <Box>
+                <Alert severity="info" sx={{ mb: 2 }}>
+                  크롤링된 원본 데이터입니다. 실제 크롤링된 텍스트 내용을 확인할 수 있습니다.
+                </Alert>
+                
+                <Box sx={{ mb: 3 }}>
+                  <Typography variant="h6" gutterBottom>
+                    크롤링 통계
+                  </Typography>
+                  <Box sx={{ display: "flex", gap: 2, mb: 2 }}>
+                    <Chip 
+                      label={`경쟁사: ${crawlingResults.competitor_features_count}개 기능`} 
+                      color="primary" 
+                      variant="outlined" 
+                    />
+                    <Chip 
+                      label={`우리 제품: ${crawlingResults.our_product_features_count}개 기능`} 
+                      color="secondary" 
+                      variant="outlined" 
+                    />
+                    <Chip 
+                      label={`상태: ${crawlingResults.crawling_status}`} 
+                      color="info" 
+                      variant="outlined" 
+                    />
+                  </Box>
+                </Box>
+
+                {/* 경쟁사 크롤링 결과 */}
+                <Box sx={{ mb: 3 }}>
+                  <Typography variant="h6" gutterBottom>
+                    경쟁사 크롤링 결과 ({crawlingResults.competitor_features.length}개)
+                  </Typography>
+                  {crawlingResults.competitor_features.map((feature, index) => (
+                    <Accordion key={index} sx={{ mb: 1 }}>
+                      <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                        <Box sx={{ display: "flex", alignItems: "center", gap: 1, width: "100%" }}>
+                          <Typography variant="subtitle1" sx={{ flex: 1 }}>
+                            {feature.title}
+                          </Typography>
+                          {feature.category && (
+                            <Chip label={feature.category} size="small" />
+                          )}
+                          {feature.granularity && (
+                            <Chip label={feature.granularity} size="small" variant="outlined" />
+                          )}
+                        </Box>
+                      </AccordionSummary>
+                      <AccordionDetails>
+                        <Box sx={{ mb: 2 }}>
+                          <Typography variant="body2" color="text.secondary" gutterBottom>
+                            내용:
+                          </Typography>
+                          <Paper sx={{ p: 2, bgcolor: 'grey.50' }}>
+                            <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>
+                              {feature.content}
+                            </Typography>
+                          </Paper>
+                        </Box>
+                        <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
+                          {feature.url && (
+                            <Button
+                              size="small"
+                              variant="outlined"
+                              href={feature.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                            >
+                              원본 페이지
+                            </Button>
+                          )}
+                          {feature.source_page_title && (
+                            <Chip 
+                              label={feature.source_page_title} 
+                              size="small" 
+                              variant="outlined" 
+                            />
+                          )}
+                        </Box>
+                      </AccordionDetails>
+                    </Accordion>
                   ))}
-                </TableBody>
-              </Table>
-            </TableContainer>
+                </Box>
+
+                {/* 우리 제품 크롤링 결과 */}
+                <Box sx={{ mb: 3 }}>
+                  <Typography variant="h6" gutterBottom>
+                    우리 제품 크롤링 결과 ({crawlingResults.our_product_features.length}개)
+                  </Typography>
+                  {crawlingResults.our_product_features.map((feature, index) => (
+                    <Accordion key={index} sx={{ mb: 1 }}>
+                      <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                        <Box sx={{ display: "flex", alignItems: "center", gap: 1, width: "100%" }}>
+                          <Typography variant="subtitle1" sx={{ flex: 1 }}>
+                            {feature.title}
+                          </Typography>
+                          {feature.category && (
+                            <Chip label={feature.category} size="small" />
+                          )}
+                          {feature.granularity && (
+                            <Chip label={feature.granularity} size="small" variant="outlined" />
+                          )}
+                        </Box>
+                      </AccordionSummary>
+                      <AccordionDetails>
+                        <Box sx={{ mb: 2 }}>
+                          <Typography variant="body2" color="text.secondary" gutterBottom>
+                            내용:
+                          </Typography>
+                          <Paper sx={{ p: 2, bgcolor: 'grey.50' }}>
+                            <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>
+                              {feature.content}
+                            </Typography>
+                          </Paper>
+                        </Box>
+                        <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
+                          {feature.url && (
+                            <Button
+                              size="small"
+                              variant="outlined"
+                              href={feature.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                            >
+                              원본 페이지
+                            </Button>
+                          )}
+                          {feature.source_page_title && (
+                            <Chip 
+                              label={feature.source_page_title} 
+                              size="small" 
+                              variant="outlined" 
+                            />
+                          )}
+                        </Box>
+                      </AccordionDetails>
+                    </Accordion>
+                  ))}
+                </Box>
+              </Box>
+            )}
           </CardContent>
         </Card>
       )}
@@ -486,12 +715,6 @@ const CrawlingPage: React.FC = () => {
           onClick={() => navigate(`/projects/${projectId}`)}
         >
           프로젝트 상세로 돌아가기
-        </Button>
-        <Button
-          variant="contained"
-          onClick={() => navigate(`/projects/${projectId}/advanced-crawling`)}
-        >
-          고급 크롤링으로 이동
         </Button>
       </Box>
 

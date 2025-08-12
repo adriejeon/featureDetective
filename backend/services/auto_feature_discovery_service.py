@@ -37,16 +37,16 @@ class AutoFeatureDiscoveryService:
         # NLTK 데이터 초기화
         self._init_nltk()
         
-        # 새로운 크롤링 모듈들 초기화
+        # 새로운 크롤링 모듈들 초기화 (선택적)
+        self.help_crawler = None
+        self.content_extractor = None
+        
+        # Selenium 크롤러 초기화를 건너뛰고 기본 크롤링만 사용
         try:
-            from crawlers.selenium_crawler import SeleniumCrawler
-            self.help_crawler = SeleniumCrawler(rate_limit=2.0, timeout=30, headless=True)
             self.content_extractor = ContentExtractor()
-            print("Selenium 크롤링 모듈들 초기화 성공")
+            print("기본 크롤링 모듈 초기화 성공")
         except Exception as e:
-            print(f"크롤링 모듈 초기화 실패: {e}")
-            self.help_crawler = None
-            self.content_extractor = None
+            print(f"기본 크롤링 모듈 초기화 실패: {e}")
         
         # 새로운 분석 모듈들 초기화
         try:

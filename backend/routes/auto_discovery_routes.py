@@ -1,10 +1,17 @@
 from flask import Blueprint, request, jsonify
 from services.auto_feature_discovery_service import AutoFeatureDiscoveryService
+from services.crawlee_crawler_service import crawl_website_sync
 import json
 import random
+import requests
+from bs4 import BeautifulSoup
+import time
 
 auto_discovery_bp = Blueprint('auto_discovery', __name__)
 auto_discovery_service = AutoFeatureDiscoveryService()
+
+# 크롤링 결과를 임시로 저장할 딕셔너리
+crawling_results_cache = {}
 
 @auto_discovery_bp.route('/discover', methods=['POST'])
 def discover_features():
@@ -32,6 +39,15 @@ def discover_features():
         print(f"자동 기능 발견 시작: {competitor_url} vs {our_product_url}")
         result = auto_discovery_service.discover_and_compare_features_with_links(competitor_url, our_product_url)
         print(f"자동 기능 발견 결과: {result}")
+        
+        # 크롤링 결과를 캐시에 저장
+        cache_key = f"{competitor_url}_{our_product_url}"
+        crawling_results_cache[cache_key] = {
+            'competitor_url': competitor_url,
+            'our_product_url': our_product_url,
+            'raw_crawling_data': result['data'],
+            'timestamp': result.get('timestamp', '')
+        }
         
         # 크롤링 결과 확인
         print(f"크롤링 결과: success={result['success']}, results_count={len(result['data'].get('results', []))}")
@@ -76,6 +92,66 @@ def discover_features():
         return jsonify({
             'success': False,
             'error': f'자동 기능 발견 중 오류가 발생했습니다: {str(e)}'
+        }), 500
+
+@auto_discovery_bp.route('/crawling-results', methods=['POST'])
+def get_crawling_results():
+    """크롤링 결과 조회 API - 실제 Crawlee 크롤링 수행"""
+    try:
+        data = request.get_json()
+        competitor_url = data.get('competitor_url', '')
+        our_product_url = data.get('our_product_url', '')
+        
+        print(f"크롤링 결과 조회 시작: {competitor_url} vs {our_product_url}")
+        
+        # 실제 Crawlee 크롤링 수행
+        competitor_results = crawl_website_sync(competitor_url)
+        our_product_results = crawl_website_sync(our_product_url)
+        
+        # 크롤링 결과를 캐시에 저장
+        cache_key = f"{competitor_url}_{our_product_url}"
+        crawling_results_cache[cache_key] = {
+            'competitor_url': competitor_url,
+            'our_product_url': our_product_url,
+            'raw_crawling_data': {
+                'competitor_features': competitor_results,
+                'our_product_features': our_product_results,
+                'competitor_features_count': len(competitor_results),
+                'our_product_features_count': len(our_product_results),
+                'crawling_status': 'success',
+                'analysis_method': 'crawlee_crawling'
+            },
+            'timestamp': time.strftime('%Y-%m-%d %H:%M:%S')
+        }
+        
+        # 크롤링된 원본 데이터 반환
+        return jsonify({
+            'success': True,
+            'message': 'Crawlee 크롤링이 완료되었습니다.',
+            'data': {
+                'competitor_url': competitor_url,
+                'our_product_url': our_product_url,
+                'competitor_features': competitor_results,
+                'our_product_features': our_product_results,
+                'competitor_features_count': len(competitor_results),
+                'our_product_features_count': len(our_product_results),
+                'crawling_status': 'success',
+                'timestamp': time.strftime('%Y-%m-%d %H:%M:%S'),
+                'raw_crawling_data': {
+                    'competitor_features': competitor_results,
+                    'our_product_features': our_product_results,
+                    'competitor_features_count': len(competitor_results),
+                    'our_product_features_count': len(our_product_results),
+                    'crawling_status': 'success',
+                    'analysis_method': 'crawlee_crawling'
+                }
+            }
+        }), 200
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': f'크롤링 결과 조회 중 오류가 발생했습니다: {str(e)}'
         }), 500
 
 @auto_discovery_bp.route('/test', methods=['POST'])
@@ -218,6 +294,267 @@ def test_discovery():
         return jsonify({
             'success': False,
             'error': f'테스트 자동 기능 발견 중 오류가 발생했습니다: {str(e)}'
+        }), 500
+
+@auto_discovery_bp.route('/test-crawling', methods=['POST'])
+def test_crawling():
+    """테스트용 크롤링 API - 실제 크롤링 결과 생성"""
+    try:
+        data = request.get_json()
+        competitor_url = data.get('competitor_url', '')
+        our_product_url = data.get('our_product_url', '')
+        
+        print(f"테스트 크롤링 시작: {competitor_url} vs {our_product_url}")
+        
+        # 실제 크롤링 수행
+        import requests
+        from bs4 import BeautifulSoup
+        
+        def crawl_site(url):
+            """간단한 사이트 크롤링"""
+            try:
+                headers = {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+                    'Accept-Language': 'ko-KR,ko;q=0.8,en-US;q=0.5,en;q=0.3',
+                }
+                
+                response = requests.get(url, headers=headers, timeout=30)
+                response.raise_for_status()
+                
+                soup = BeautifulSoup(response.text, 'html.parser')
+                
+                # 제목과 메타 설명 추출
+                title = soup.find('title')
+                title_text = title.get_text().strip() if title else "제목 없음"
+                
+                meta_desc = soup.find('meta', attrs={'name': 'description'})
+                description = meta_desc.get('content', '') if meta_desc else ""
+                
+                # 주요 텍스트 콘텐츠 추출
+                text_content = soup.get_text()
+                
+                # 링크들 추출
+                links = []
+                for link in soup.find_all('a', href=True)[:20]:  # 처음 20개만
+                    href = link.get('href')
+                    text = link.get_text().strip()
+                    if text and href:
+                        links.append({
+                            'text': text[:100],
+                            'url': href
+                        })
+                
+                return {
+                    'title': title_text,
+                    'description': description,
+                    'content': text_content[:2000],  # 처음 2000자만
+                    'links': links,
+                    'url': url
+                }
+                
+            except Exception as e:
+                print(f"크롤링 오류 ({url}): {e}")
+                return {
+                    'title': '크롤링 실패',
+                    'description': f'오류: {str(e)}',
+                    'content': '',
+                    'links': [],
+                    'url': url
+                }
+        
+        # 두 사이트 크롤링
+        competitor_data = crawl_site(competitor_url)
+        our_product_data = crawl_site(our_product_url)
+        
+        # 크롤링 결과를 캐시에 저장
+        cache_key = f"{competitor_url}_{our_product_url}"
+        crawling_results_cache[cache_key] = {
+            'competitor_url': competitor_url,
+            'our_product_url': our_product_url,
+            'raw_crawling_data': {
+                'competitor_features': [competitor_data],
+                'our_product_features': [our_product_data],
+                'competitor_features_count': 1,
+                'our_product_features_count': 1,
+                'crawling_status': 'success',
+                'analysis_method': 'test_crawling'
+            },
+            'timestamp': time.strftime('%Y-%m-%d %H:%M:%S')
+        }
+        
+        return jsonify({
+            'success': True,
+            'message': '테스트 크롤링이 완료되었습니다.',
+            'data': {
+                'competitor_url': competitor_url,
+                'our_product_url': our_product_url,
+                'competitor_data': competitor_data,
+                'our_product_data': our_product_data,
+                'crawling_status': 'success'
+            }
+        }), 200
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': f'테스트 크롤링 중 오류가 발생했습니다: {str(e)}'
+        }), 500
+
+@auto_discovery_bp.route('/simulate-crawling', methods=['POST'])
+def simulate_crawling():
+    """크롤링 결과 시뮬레이션 API - 실제 URL 크롤링"""
+    try:
+        data = request.get_json()
+        competitor_url = data.get('competitor_url', '')
+        our_product_url = data.get('our_product_url', '')
+        
+        print(f"크롤링 시뮬레이션 시작: {competitor_url} vs {our_product_url}")
+        
+        def crawl_site(url):
+            """실제 사이트 크롤링"""
+            try:
+                headers = {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+                    'Accept-Language': 'ko-KR,ko;q=0.8,en-US;q=0.5,en;q=0.3',
+                }
+                
+                response = requests.get(url, headers=headers, timeout=30)
+                response.raise_for_status()
+                
+                soup = BeautifulSoup(response.text, 'html.parser')
+                
+                # 제목과 메타 설명 추출
+                title = soup.find('title')
+                title_text = title.get_text().strip() if title else "제목 없음"
+                
+                meta_desc = soup.find('meta', attrs={'name': 'description'})
+                description = meta_desc.get('content', '') if meta_desc else ""
+                
+                # 주요 텍스트 콘텐츠 추출
+                text_content = soup.get_text()
+                
+                # 링크들 추출
+                links = []
+                for link in soup.find_all('a', href=True)[:20]:  # 처음 20개만
+                    href = link.get('href')
+                    text = link.get_text().strip()
+                    if text and href:
+                        links.append({
+                            'text': text[:100],
+                            'url': href
+                        })
+                
+                # 기능 관련 키워드로 텍스트 분석
+                feature_keywords = [
+                    '채팅', '메시지', '파일', '공유', '화상', '회의', '통화', '앱', '모바일', '봇', 'API',
+                    '보안', '설정', '알림', '검색', '백업', '동기화', '그룹', '채널', '워크스페이스',
+                    'chat', 'message', 'file', 'share', 'video', 'call', 'meeting', 'app', 'mobile', 'bot',
+                    'security', 'setting', 'notification', 'search', 'backup', 'sync', 'group', 'channel'
+                ]
+                
+                # 기능 관련 섹션 찾기
+                features = []
+                for keyword in feature_keywords:
+                    # 제목에서 키워드 찾기
+                    title_elements = soup.find_all(['h1', 'h2', 'h3', 'h4', 'h5', 'h6'])
+                    for element in title_elements:
+                        if keyword.lower() in element.get_text().lower():
+                            # 해당 섹션의 내용 추출
+                            content = ""
+                            next_element = element.find_next_sibling()
+                            for _ in range(5):  # 다음 5개 요소까지 내용 수집
+                                if next_element:
+                                    if next_element.name in ['p', 'div', 'span']:
+                                        content += next_element.get_text() + " "
+                                    next_element = next_element.find_next_sibling()
+                                else:
+                                    break
+                            
+                            if content.strip():
+                                features.append({
+                                    'title': element.get_text().strip(),
+                                    'content': content.strip()[:500] + "..." if len(content) > 500 else content.strip(),
+                                    'url': url,
+                                    'source_page_title': title_text,
+                                    'category': '기능',
+                                    'granularity': 'medium'
+                                })
+                                break  # 각 키워드당 하나씩만 추가
+                
+                # 링크에서 기능 관련 페이지 찾기
+                for link in links[:10]:  # 처음 10개 링크만 확인
+                    if any(keyword.lower() in link['text'].lower() for keyword in feature_keywords):
+                        features.append({
+                            'title': link['text'],
+                            'content': f"{link['text']} 관련 기능 페이지입니다. {description}",
+                            'url': link['url'] if link['url'].startswith('http') else url + link['url'],
+                            'source_page_title': title_text,
+                            'category': '기능',
+                            'granularity': 'medium'
+                        })
+                
+                # 기본 정보도 추가
+                if not features:
+                    features.append({
+                        'title': title_text,
+                        'content': description or text_content[:1000] + "..." if len(text_content) > 1000 else text_content,
+                        'url': url,
+                        'source_page_title': title_text,
+                        'category': '일반',
+                        'granularity': 'medium'
+                    })
+                
+                return features
+                
+            except Exception as e:
+                print(f"크롤링 오류 ({url}): {e}")
+                return [{
+                    'title': '크롤링 실패',
+                    'content': f'오류: {str(e)}',
+                    'url': url,
+                    'source_page_title': '오류',
+                    'category': '오류',
+                    'granularity': 'medium'
+                }]
+        
+        # 두 사이트 크롤링
+        competitor_features = crawl_site(competitor_url)
+        our_product_features = crawl_site(our_product_url)
+        
+        # 크롤링 결과를 캐시에 저장
+        cache_key = f"{competitor_url}_{our_product_url}"
+        crawling_results_cache[cache_key] = {
+            'competitor_url': competitor_url,
+            'our_product_url': our_product_url,
+            'raw_crawling_data': {
+                'competitor_features': competitor_features,
+                'our_product_features': our_product_features,
+                'competitor_features_count': len(competitor_features),
+                'our_product_features_count': len(our_product_features),
+                'crawling_status': 'success',
+                'analysis_method': 'real_crawling'
+            },
+            'timestamp': time.strftime('%Y-%m-%d %H:%M:%S')
+        }
+        
+        return jsonify({
+            'success': True,
+            'message': '실제 크롤링이 완료되었습니다.',
+            'data': {
+                'competitor_url': competitor_url,
+                'our_product_url': our_product_url,
+                'competitor_features_count': len(competitor_features),
+                'our_product_features_count': len(our_product_features),
+                'crawling_status': 'success'
+            }
+        }), 200
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': f'크롤링 시뮬레이션 중 오류가 발생했습니다: {str(e)}'
         }), 500
 
 def _generate_analysis_from_crawled_data(crawled_data, competitor_url, our_product_url):
