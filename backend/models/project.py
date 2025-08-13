@@ -1,6 +1,5 @@
 from datetime import datetime
-from flask_sqlalchemy import SQLAlchemy
-from app import db
+from extensions import db
 
 class Project(db.Model):
     """프로젝트 모델"""

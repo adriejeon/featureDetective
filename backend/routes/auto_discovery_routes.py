@@ -35,10 +35,10 @@ def discover_features():
         if not our_product_url.startswith(('http://', 'https://')):
             return jsonify({'error': '우리 제품 URL이 유효하지 않습니다'}), 400
         
-        # 실제 크롤링 기반 자동 기능 발견 실행
-        print(f"자동 기능 발견 시작: {competitor_url} vs {our_product_url}")
-        result = auto_discovery_service.discover_and_compare_features_with_links(competitor_url, our_product_url)
-        print(f"자동 기능 발견 결과: {result}")
+        # Vertex AI 통합 자동 기능 발견 실행
+        print(f"Vertex AI 통합 자동 기능 발견 시작: {competitor_url} vs {our_product_url}")
+        result = auto_discovery_service.discover_and_compare_features(competitor_url, our_product_url)
+        print(f"Vertex AI 통합 자동 기능 발견 결과: {result}")
         
         # 크롤링 결과를 캐시에 저장
         cache_key = f"{competitor_url}_{our_product_url}"
@@ -59,21 +59,12 @@ def discover_features():
             print("크롤링 실패 또는 결과 없음, 실제 크롤링 결과 기반 분석 생성")
             return _generate_analysis_from_crawled_data(result['data'], competitor_url, our_product_url)
         
-        # 새로운 Vertex AI 분석 결과가 있으면 그대로 반환
-        if result['success'] and result['data'].get('analysis_method') == 'new_vertex_ai':
-            print("새로운 Vertex AI 분석 결과 반환")
+        # Vertex AI 통합 분석 결과 반환
+        if result['success'] and result['data'].get('analysis_method') == 'vertex_ai_integrated':
+            print("Vertex AI 통합 분석 결과 반환")
             return jsonify({
                 'success': True,
-                'message': '새로운 Vertex AI 기반 세부 기능 분석이 완료되었습니다',
-                'data': result['data']
-            }), 200
-        
-        # 기존 Vertex AI 분석 결과가 있으면 그대로 반환
-        if result['success'] and result['data'].get('analysis_method') == 'vertex_ai':
-            print("기존 Vertex AI 분석 결과 반환")
-            return jsonify({
-                'success': True,
-                'message': 'Vertex AI 기반 자동 기능 발견이 완료되었습니다',
+                'message': 'Vertex AI 통합 자동 기능 발견이 완료되었습니다',
                 'data': result['data']
             }), 200
         

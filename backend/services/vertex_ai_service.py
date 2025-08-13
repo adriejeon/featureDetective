@@ -35,10 +35,10 @@ class VertexAIService:
         try:
             self.client = genai.Client(
                 vertexai=True,
-                project=project_id,
-                location=location,
+                project=self.project_id,
+                location=self.location,
             )
-            logger.info(f"Vertex AI 클라이언트 초기화 완료: {project_id}")
+            logger.info(f"Vertex AI 클라이언트 초기화 완료: {self.project_id}")
         except Exception as e:
             logger.error(f"Vertex AI 클라이언트 초기화 실패: {e}")
             raise

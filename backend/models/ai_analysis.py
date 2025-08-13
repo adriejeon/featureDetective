@@ -3,8 +3,7 @@ AI 분석 결과 모델
 """
 
 from datetime import datetime
-from flask_sqlalchemy import SQLAlchemy
-from app import db
+from extensions import db
 import json
 
 class AIAnalysis(db.Model):

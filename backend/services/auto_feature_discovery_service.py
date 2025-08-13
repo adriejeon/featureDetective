@@ -18,6 +18,7 @@ import itertools
 from analyzers import VertexAIClient, FeatureExtractor, FeatureComparator, ReportGenerator
 from crawlers.help_doc_crawler import HelpDocCrawler
 from crawlers.content_extractor import ContentExtractor
+from services.vertex_ai_analysis_service import analyze_features_sync
 
 class AutoFeatureDiscoveryService:
     """자동 기능 발견 서비스"""
@@ -161,22 +162,39 @@ class AutoFeatureDiscoveryService:
             nltk.download('omw-1.4', quiet=True)
     
     def discover_and_compare_features(self, competitor_url: str, our_product_url: str) -> Dict:
-        """자동 기능 발견 및 비교"""
+        """자동 기능 발견 및 비교 (Vertex AI 통합)"""
         try:
-            # 두 URL에서 텍스트 크롤링
+            print(f"Vertex AI 통합 기능 발견 시작: {competitor_url} vs {our_product_url}")
+            
+            # 재귀 크롤러를 사용하여 데이터 수집
+            from services.crawlee_crawler_service import crawl_website_sync
+            
+            # 경쟁사 크롤링
+            print("경쟁사 크롤링 시작...")
+            competitor_data = crawl_website_sync(competitor_url)
+            
+            # 우리 제품 크롤링
+            print("우리 제품 크롤링 시작...")
+            our_product_data = crawl_website_sync(our_product_url)
+            
+            print(f"크롤링 완료: 경쟁사 {len(competitor_data)}개 페이지, 우리 제품 {len(our_product_data)}개 페이지")
+            
+            # Vertex AI를 사용한 기능 분석
+            print("Vertex AI 기능 분석 시작...")
+            analysis_result = analyze_features_sync(competitor_data, our_product_data)
+            
+            # 기존 방식의 fallback 분석도 수행
+            print("기존 방식 분석 시작...")
             competitor_text = self._crawl_and_extract_text(competitor_url)
             our_product_text = self._crawl_and_extract_text(our_product_url)
             
-            # 기능 섹션 추출
             competitor_features = self._extract_feature_sections(competitor_text)
             our_product_features = self._extract_feature_sections(our_product_text)
             
-            # 기능 클러스터링 및 매칭
             matched_features = self._match_features(competitor_features, our_product_features)
-            
-            # 분석 결과 생성
             analysis_results = self._analyze_matched_features(matched_features, competitor_text, our_product_text)
             
+            # 결과 통합
             return {
                 'success': True,
                 'data': {
@@ -184,12 +202,17 @@ class AutoFeatureDiscoveryService:
                     'our_product_url': our_product_url,
                     'discovered_features': len(matched_features),
                     'results': analysis_results,
-                    'competitor_features_count': len(competitor_features),
-                    'our_product_features_count': len(our_product_features)
+                    'competitor_features_count': len(competitor_data),
+                    'our_product_features_count': len(our_product_data),
+                    'competitor_features': competitor_data,
+                    'our_product_features': our_product_data,
+                    'vertex_ai_analysis': analysis_result,
+                    'analysis_method': 'vertex_ai_integrated'
                 }
             }
             
         except Exception as e:
+            print(f"기능 발견 오류: {e}")
             return {
                 'success': False,
                 'error': str(e),

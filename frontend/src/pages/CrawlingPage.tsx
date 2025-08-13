@@ -62,6 +62,61 @@ interface CrawlingResults {
   timestamp: string;
 }
 
+interface VertexAIAnalysis {
+  success: boolean;
+  competitor_features: {
+    extracted_features: Array<{
+      name: string;
+      category: string;
+      description: string;
+      confidence: number;
+      source_pages: string[];
+    }>;
+    analysis_summary: {
+      total_features: number;
+      main_categories: string[];
+      document_quality: string;
+    };
+  };
+  our_product_features: {
+    extracted_features: Array<{
+      name: string;
+      category: string;
+      description: string;
+      confidence: number;
+      source_pages: string[];
+    }>;
+    analysis_summary: {
+      total_features: number;
+      main_categories: string[];
+      document_quality: string;
+    };
+  };
+  comparison_analysis: {
+    feature_comparison: Array<{
+      feature_name: string;
+      competitor_implementation: string;
+      our_implementation: string;
+      advantage: string;
+      gap: string;
+      priority: string;
+    }>;
+    competitive_analysis: {
+      our_advantages: string[];
+      competitor_advantages: string[];
+      market_gaps: string[];
+      recommendations: string[];
+    };
+    summary: {
+      total_comparable_features: number;
+      our_unique_features: number;
+      competitor_unique_features: number;
+      overall_assessment: string;
+    };
+  };
+  analysis_method: string;
+}
+
 const CrawlingPage: React.FC = () => {
   const { projectId } = useParams();
   const navigate = useNavigate();
@@ -77,6 +132,7 @@ const CrawlingPage: React.FC = () => {
   const [selectedResult, setSelectedResult] = React.useState<AnalysisResult | null>(null);
   const [detailModalOpen, setDetailModalOpen] = React.useState(false);
   const [crawlingResults, setCrawlingResults] = React.useState<CrawlingResults | null>(null);
+  const [vertexAIAnalysis, setVertexAIAnalysis] = React.useState<VertexAIAnalysis | null>(null);
   const [activeTab, setActiveTab] = React.useState(0);
   const [loadingCrawlingResults, setLoadingCrawlingResults] = React.useState(false);
 
@@ -106,7 +162,7 @@ const CrawlingPage: React.FC = () => {
           .filter((f) => f);
 
         const response = await fetch(
-          "http://127.0.0.1:5003/api/feature-analysis/analyze",
+          "http://127.0.0.1:5001/api/feature-analysis/analyze",
           {
             method: "POST",
             headers: {
@@ -123,82 +179,90 @@ const CrawlingPage: React.FC = () => {
         const data = await response.json();
 
         if (data.success) {
-          apiResults = data.data.results.map((result: any) => ({
-            feature: result.feature,
-            competitor: result.competitor.status,
-            ourProduct: result.our_product.status,
-            competitorDescription: result.competitor.text,
-            ourProductDescription: result.our_product.text,
-            competitorLink: competitorUrl,
-            ourProductLink: ourProductUrl,
-          }));
+          // Vertex AI 분석 결과가 있는지 확인
+          if (data.data.vertex_ai_analysis) {
+            setVertexAIAnalysis(data.data.vertex_ai_analysis);
+            console.log("Vertex AI 분석 결과:", data.data.vertex_ai_analysis);
+          }
+          
+          // 기존 분석 결과도 처리
+          if (data.data.results) {
+            apiResults = data.data.results.map((result: any) => ({
+              feature: result.feature,
+              competitor: result.competitor.status,
+              ourProduct: result.our_product.status,
+              competitorDescription: result.competitor.text,
+              ourProductDescription: result.our_product.text,
+              competitorLink: competitorUrl,
+              ourProductLink: ourProductUrl,
+            }));
+          }
         } else {
           setError(data.error || "분석 중 오류가 발생했습니다.");
           return;
         }
       } else {
-        // 자동 발견 모드 (실제 크롤링 API 사용)
-        console.log("자동 기능 발견 모드 시작");
+        // 자동 발견 모드 (새로운 통합 기능 탐지 API 사용)
+        console.log("통합 기능 탐지 모드 시작");
         const response = await fetch(
-          "http://127.0.0.1:5003/api/auto-discovery/discover",
+          "http://127.0.0.1:5001/api/feature-detection/detect-features",
           {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
             },
             body: JSON.stringify({
-              competitor_url: competitorUrl.trim(),
-              our_product_url: ourProductUrl.trim(),
+              competitor_urls: [competitorUrl.trim()],
+              our_product_urls: [ourProductUrl.trim()],
+              project_name: "자동 기능 탐지 프로젝트"
             }),
           }
         );
 
         const data = await response.json();
-        console.log("자동 발견 API 응답:", data); // 디버깅용
+        console.log("통합 기능 탐지 API 응답:", data); // 디버깅용
 
         if (data.success) {
           console.log("API 응답 데이터:", data); // 디버깅용
           
-          // 새로운 Vertex AI 분석 결과 처리
-          if (data.data.analysis_method === 'new_vertex_ai') {
-            console.log("새로운 Vertex AI 분석 결과 처리");
-            console.log("결과 데이터:", data.data.results);
-            
-            if (data.data.results && Array.isArray(data.data.results)) {
-              apiResults = data.data.results.map((result: any) => ({
-                feature: result.feature_name,
-                competitor: result.competitor?.status || 'X',
-                ourProduct: result.our_product?.status || 'X',
-                competitorDescription: result.competitor?.text || '기능 정보 없음',
-                ourProductDescription: result.our_product?.text || '기능 정보 없음',
-                competitorLink: result.competitor?.url || competitorUrl,
-                ourProductLink: result.our_product?.url || ourProductUrl,
-              }));
-            } else {
-              console.log("결과 데이터가 배열이 아님:", data.data.results);
-              apiResults = [];
-            }
-          } else {
-            // 기존 형식 결과 처리
-            if (data.data.results && Array.isArray(data.data.results)) {
-              apiResults = data.data.results.map((result: any) => ({
-                feature: result.feature_name,
-                competitor: result.competitor?.status || 'X',
-                ourProduct: result.our_product?.status || 'X',
-                competitorDescription: result.competitor?.text || '기능 정보 없음',
-                ourProductDescription: result.our_product?.text || '기능 정보 없음',
-                competitorLink: result.competitor?.url || competitorUrl,
-                ourProductLink: result.our_product?.url || ourProductUrl,
-              }));
-            } else {
-              console.log("기존 형식 결과 데이터가 배열이 아님:", data.data.results);
-              apiResults = [];
-            }
+          // 통합 기능 탐지 결과 처리
+          const analysisResults = data.data.analysis_results;
+          const competitorFeatures = analysisResults.competitor_features.extracted_features || [];
+          const ourProductFeatures = analysisResults.our_product_features.extracted_features || [];
+          const comparisonAnalysis = analysisResults.comparison_analysis || {};
+          
+          // 기능 비교 결과 생성
+          apiResults = [];
+          
+          // 경쟁사 기능들 처리
+          for (const feature of competitorFeatures) {
+            apiResults.push({
+              feature: feature.name,
+              competitor: 'O',
+              ourProduct: 'X',
+              competitorDescription: `${feature.description} (신뢰도: ${(feature.confidence * 100).toFixed(1)}%)`,
+              ourProductDescription: `우리 제품에서 '${feature.name}'과 유사한 기능을 찾아보았습니다. 해당 기능의 구현 방식과 특징을 분석하여 경쟁력 있는 솔루션을 제공할 수 있는지 검토가 필요합니다.`,
+              competitorLink: competitorUrl,
+              ourProductLink: ourProductUrl,
+            });
+          }
+          
+          // 우리 제품 기능들 처리
+          for (const feature of ourProductFeatures) {
+            apiResults.push({
+              feature: feature.name,
+              competitor: 'X',
+              ourProduct: 'O',
+              competitorDescription: `경쟁사에서 '${feature.name}'과 유사한 기능을 찾아보았습니다. 해당 기능의 구현 방식과 특징을 분석하여 경쟁력 있는 솔루션을 제공할 수 있는지 검토가 필요합니다.`,
+              ourProductDescription: `${feature.description} (신뢰도: ${(feature.confidence * 100).toFixed(1)}%)`,
+              competitorLink: competitorUrl,
+              ourProductLink: ourProductUrl,
+            });
           }
           
           console.log("처리된 결과:", apiResults); // 디버깅용
         } else {
-          setError(data.error || "자동 기능 발견 중 오류가 발생했습니다.");
+          setError(data.error || "통합 기능 탐지 중 오류가 발생했습니다.");
           return;
         }
       }
@@ -415,12 +479,15 @@ const CrawlingPage: React.FC = () => {
       </Box>
 
       {/* 결과 탭 */}
-      {(results.length > 0 || crawlingResults) && (
+      {(results.length > 0 || crawlingResults || vertexAIAnalysis) && (
         <Card>
           <CardContent>
             <Tabs value={activeTab} onChange={(e, newValue) => setActiveTab(newValue)} sx={{ mb: 2 }}>
               {results.length > 0 && (
                 <Tab label={`분석 결과 (${results.length}개)`} />
+              )}
+              {vertexAIAnalysis && (
+                <Tab label="Vertex AI 분석" />
               )}
               {crawlingResults && (
                 <Tab label="크롤링 결과" />
@@ -562,8 +629,245 @@ const CrawlingPage: React.FC = () => {
               </Box>
             )}
 
+            {/* Vertex AI 분석 탭 */}
+            {activeTab === 1 && vertexAIAnalysis && (
+              <Box>
+                <Alert severity="success" sx={{ mb: 2 }}>
+                  Vertex AI를 사용한 고급 기능 분석이 완료되었습니다.
+                </Alert>
+                
+                {/* 경쟁사 기능 분석 */}
+                <Box sx={{ mb: 4 }}>
+                  <Typography variant="h6" gutterBottom>
+                    경쟁사 기능 분석
+                  </Typography>
+                  <Box sx={{ mb: 2 }}>
+                    <Typography variant="body2" color="text.secondary">
+                      총 {vertexAIAnalysis.competitor_features.analysis_summary.total_features}개 기능 발견
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      주요 카테고리: {vertexAIAnalysis.competitor_features.analysis_summary.main_categories.join(', ')}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      문서 품질: {vertexAIAnalysis.competitor_features.analysis_summary.document_quality}
+                    </Typography>
+                  </Box>
+                  
+                  {vertexAIAnalysis.competitor_features.extracted_features.map((feature, index) => (
+                    <Accordion key={index} sx={{ mb: 1 }}>
+                      <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                        <Box sx={{ display: "flex", alignItems: "center", gap: 1, width: "100%" }}>
+                          <Typography variant="subtitle1" sx={{ flex: 1 }}>
+                            {feature.name}
+                          </Typography>
+                          <Chip label={feature.category} size="small" />
+                          <Chip label={`${(feature.confidence * 100).toFixed(0)}%`} size="small" variant="outlined" />
+                        </Box>
+                      </AccordionSummary>
+                      <AccordionDetails>
+                        <Typography variant="body2" sx={{ mb: 2 }}>
+                          {feature.description}
+                        </Typography>
+                        {feature.source_pages.length > 0 && (
+                          <Box>
+                            <Typography variant="body2" color="text.secondary" gutterBottom>
+                              출처 페이지:
+                            </Typography>
+                            {feature.source_pages.map((page, idx) => (
+                              <Chip key={idx} label={page} size="small" variant="outlined" sx={{ mr: 1, mb: 1 }} />
+                            ))}
+                          </Box>
+                        )}
+                      </AccordionDetails>
+                    </Accordion>
+                  ))}
+                </Box>
+
+                {/* 우리 제품 기능 분석 */}
+                <Box sx={{ mb: 4 }}>
+                  <Typography variant="h6" gutterBottom>
+                    우리 제품 기능 분석
+                  </Typography>
+                  <Box sx={{ mb: 2 }}>
+                    <Typography variant="body2" color="text.secondary">
+                      총 {vertexAIAnalysis.our_product_features.analysis_summary.total_features}개 기능 발견
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      주요 카테고리: {vertexAIAnalysis.our_product_features.analysis_summary.main_categories.join(', ')}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      문서 품질: {vertexAIAnalysis.our_product_features.analysis_summary.document_quality}
+                    </Typography>
+                  </Box>
+                  
+                  {vertexAIAnalysis.our_product_features.extracted_features.map((feature, index) => (
+                    <Accordion key={index} sx={{ mb: 1 }}>
+                      <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                        <Box sx={{ display: "flex", alignItems: "center", gap: 1, width: "100%" }}>
+                          <Typography variant="subtitle1" sx={{ flex: 1 }}>
+                            {feature.name}
+                          </Typography>
+                          <Chip label={feature.category} size="small" />
+                          <Chip label={`${(feature.confidence * 100).toFixed(0)}%`} size="small" variant="outlined" />
+                        </Box>
+                      </AccordionSummary>
+                      <AccordionDetails>
+                        <Typography variant="body2" sx={{ mb: 2 }}>
+                          {feature.description}
+                        </Typography>
+                        {feature.source_pages.length > 0 && (
+                          <Box>
+                            <Typography variant="body2" color="text.secondary" gutterBottom>
+                              출처 페이지:
+                            </Typography>
+                            {feature.source_pages.map((page, idx) => (
+                              <Chip key={idx} label={page} size="small" variant="outlined" sx={{ mr: 1, mb: 1 }} />
+                            ))}
+                          </Box>
+                        )}
+                      </AccordionDetails>
+                    </Accordion>
+                  ))}
+                </Box>
+
+                {/* 기능 비교 분석 */}
+                <Box sx={{ mb: 4 }}>
+                  <Typography variant="h6" gutterBottom>
+                    기능 비교 분석
+                  </Typography>
+                  
+                  {vertexAIAnalysis.comparison_analysis.feature_comparison.map((comparison, index) => (
+                    <Accordion key={index} sx={{ mb: 1 }}>
+                      <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                        <Box sx={{ display: "flex", alignItems: "center", gap: 1, width: "100%" }}>
+                          <Typography variant="subtitle1" sx={{ flex: 1 }}>
+                            {comparison.feature_name}
+                          </Typography>
+                          <Chip 
+                            label={comparison.priority} 
+                            size="small" 
+                            color={comparison.priority === 'high' ? 'error' : comparison.priority === 'medium' ? 'warning' : 'default'}
+                          />
+                        </Box>
+                      </AccordionSummary>
+                      <AccordionDetails>
+                        <Box sx={{ mb: 2 }}>
+                          <Typography variant="subtitle2" gutterBottom>
+                            경쟁사 구현:
+                          </Typography>
+                          <Typography variant="body2" sx={{ mb: 2 }}>
+                            {comparison.competitor_implementation}
+                          </Typography>
+                          
+                          <Typography variant="subtitle2" gutterBottom>
+                            우리 제품 구현:
+                          </Typography>
+                          <Typography variant="body2" sx={{ mb: 2 }}>
+                            {comparison.our_implementation}
+                          </Typography>
+                          
+                          <Typography variant="subtitle2" gutterBottom>
+                            우리 제품의 장점:
+                          </Typography>
+                          <Typography variant="body2" sx={{ mb: 2 }}>
+                            {comparison.advantage}
+                          </Typography>
+                          
+                          <Typography variant="subtitle2" gutterBottom>
+                            개선이 필요한 부분:
+                          </Typography>
+                          <Typography variant="body2">
+                            {comparison.gap}
+                          </Typography>
+                        </Box>
+                      </AccordionDetails>
+                    </Accordion>
+                  ))}
+                </Box>
+
+                {/* 경쟁력 분석 요약 */}
+                <Box sx={{ mb: 4 }}>
+                  <Typography variant="h6" gutterBottom>
+                    경쟁력 분석 요약
+                  </Typography>
+                  
+                  <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 2, mb: 3 }}>
+                    <Card>
+                      <CardContent>
+                        <Typography variant="subtitle2" gutterBottom>
+                          우리 제품의 강점
+                        </Typography>
+                        {vertexAIAnalysis.comparison_analysis.competitive_analysis.our_advantages.map((advantage, index) => (
+                          <Typography key={index} variant="body2" sx={{ mb: 1 }}>
+                            • {advantage}
+                          </Typography>
+                        ))}
+                      </CardContent>
+                    </Card>
+                    
+                    <Card>
+                      <CardContent>
+                        <Typography variant="subtitle2" gutterBottom>
+                          경쟁사의 강점
+                        </Typography>
+                        {vertexAIAnalysis.comparison_analysis.competitive_analysis.competitor_advantages.map((advantage, index) => (
+                          <Typography key={index} variant="body2" sx={{ mb: 1 }}>
+                            • {advantage}
+                          </Typography>
+                        ))}
+                      </CardContent>
+                    </Card>
+                  </Box>
+                  
+                  <Box sx={{ mb: 3 }}>
+                    <Typography variant="subtitle2" gutterBottom>
+                      시장에서 부족한 기능
+                    </Typography>
+                    {vertexAIAnalysis.comparison_analysis.competitive_analysis.market_gaps.map((gap, index) => (
+                      <Typography key={index} variant="body2" sx={{ mb: 1 }}>
+                        • {gap}
+                      </Typography>
+                    ))}
+                  </Box>
+                  
+                  <Box sx={{ mb: 3 }}>
+                    <Typography variant="subtitle2" gutterBottom>
+                      개선 제안사항
+                    </Typography>
+                    {vertexAIAnalysis.comparison_analysis.competitive_analysis.recommendations.map((recommendation, index) => (
+                      <Typography key={index} variant="body2" sx={{ mb: 1 }}>
+                        • {recommendation}
+                      </Typography>
+                    ))}
+                  </Box>
+                  
+                  <Card>
+                    <CardContent>
+                      <Typography variant="subtitle2" gutterBottom>
+                        전체적인 경쟁력 평가
+                      </Typography>
+                      <Typography variant="body1">
+                        {vertexAIAnalysis.comparison_analysis.summary.overall_assessment}
+                      </Typography>
+                      <Box sx={{ mt: 2, display: "flex", gap: 2 }}>
+                        <Typography variant="body2">
+                          비교 가능한 기능: {vertexAIAnalysis.comparison_analysis.summary.total_comparable_features}개
+                        </Typography>
+                        <Typography variant="body2">
+                          우리만의 고유 기능: {vertexAIAnalysis.comparison_analysis.summary.our_unique_features}개
+                        </Typography>
+                        <Typography variant="body2">
+                          경쟁사만의 고유 기능: {vertexAIAnalysis.comparison_analysis.summary.competitor_unique_features}개
+                        </Typography>
+                      </Box>
+                    </CardContent>
+                  </Card>
+                </Box>
+              </Box>
+            )}
+
             {/* 크롤링 결과 탭 */}
-            {activeTab === 1 && crawlingResults && (
+            {activeTab === 2 && crawlingResults && (
               <Box>
                 <Alert severity="info" sx={{ mb: 2 }}>
                   크롤링된 원본 데이터입니다. 실제 크롤링된 텍스트 내용을 확인할 수 있습니다.

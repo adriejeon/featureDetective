@@ -8,7 +8,7 @@ from models.ai_analysis import AIAnalysis, ExtractedFeature, ProductComparison
 from services.crawling_service import CrawlingService
 from services.vertex_ai_service import VertexAIService
 from tasks.ai_analysis_tasks import analyze_crawled_content_task, batch_ai_analysis_task
-from app import db
+from extensions import db
 import logging
 
 logger = logging.getLogger(__name__)

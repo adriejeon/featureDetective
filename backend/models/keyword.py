@@ -1,6 +1,5 @@
 from datetime import datetime
-from flask_sqlalchemy import SQLAlchemy
-from app import db
+from extensions import db
 
 class Keyword(db.Model):
     """키워드 모델"""

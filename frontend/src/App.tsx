@@ -9,6 +9,7 @@ import ProjectList from "./pages/ProjectList";
 import ProjectDetail from "./pages/ProjectDetail";
 import KeywordManagement from "./pages/KeywordManagement";
 import CrawlingPage from "./pages/CrawlingPage";
+import FeatureDetection from "./pages/FeatureDetection";
 
 import NewProject from "./pages/NewProject";
 
@@ -53,6 +54,7 @@ function App() {
                 element={<KeywordManagement />}
               />
               <Route path="/projects/:id/crawling" element={<CrawlingPage />} />
+              <Route path="/feature-detection" element={<FeatureDetection />} />
 
             </Routes>
           </Container>

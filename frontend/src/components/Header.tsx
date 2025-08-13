@@ -5,6 +5,7 @@ import {
   Dashboard as DashboardIcon,
   List as ListIcon,
   Add as AddIcon,
+  Psychology as PsychologyIcon,
 } from "@mui/icons-material";
 
 const Header: React.FC = () => {
@@ -65,6 +66,19 @@ const Header: React.FC = () => {
             }}
           >
             새 프로젝트
+          </Button>
+
+          <Button
+            color="inherit"
+            startIcon={<PsychologyIcon />}
+            onClick={() => navigate("/feature-detection")}
+            sx={{
+              backgroundColor: isActive("/feature-detection")
+                ? "rgba(255, 255, 255, 0.1)"
+                : "transparent",
+            }}
+          >
+            AI 기능 탐지
           </Button>
         </Box>
       </Toolbar>
