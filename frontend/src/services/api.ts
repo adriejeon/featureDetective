@@ -2,7 +2,7 @@ import axios, { AxiosInstance, AxiosResponse } from "axios";
 
 // API 기본 설정
 const API_BASE_URL =
-  process.env.REACT_APP_API_URL || "http://127.0.0.1:5001/api";
+  process.env.REACT_APP_API_URL || "http://127.0.0.1:5003/api";
 
 // Axios 인스턴스 생성
 const apiClient: AxiosInstance = axios.create({
@@ -136,57 +136,75 @@ export const crawlingAPI = {
     apiClient.delete(`/crawling/results/${resultId}`),
 };
 
-
-
 // 자동 기능 발견 API
 export const autoDiscoveryAPI = {
   // 자동 기능 발견
   discoverFeatures: (competitorUrl: string, ourProductUrl: string) =>
-    apiClient.post('/auto-discovery/discover', {
+    apiClient.post("/auto-discovery/discover", {
       competitor_url: competitorUrl,
-      our_product_url: ourProductUrl
+      our_product_url: ourProductUrl,
     }),
 
   // 크롤링 결과 조회
   getCrawlingResults: (competitorUrl: string, ourProductUrl: string) =>
-    apiClient.post('/auto-discovery/crawling-results', {
+    apiClient.post("/auto-discovery/crawling-results", {
       competitor_url: competitorUrl,
-      our_product_url: ourProductUrl
+      our_product_url: ourProductUrl,
     }),
 };
 
 // 통합 기능 탐지 API
 export const featureDetectionAPI = {
-  // URL 목록에서 기능 탐지 및 분석
-  detectFeatures: (competitorUrls: string[], ourProductUrls: string[], projectName: string) =>
-    apiClient.post('/feature-detection/detect-features', {
+  // URL 목록에서 기능 탐지 및 분석 (비동기 Job)
+  detectFeatures: (
+    competitorUrls: string[],
+    ourProductUrls: string[],
+    projectName: string
+  ) =>
+    apiClient.post("/feature-detection/detect-features", {
       competitor_urls: competitorUrls,
       our_product_urls: ourProductUrls,
-      project_name: projectName
+      project_name: projectName,
     }),
 
   // 단일 URL에서 기능 분석
   analyzeSingleUrl: (url: string, companyName: string) =>
-    apiClient.post('/feature-detection/analyze-single-url', {
+    apiClient.post("/feature-detection/analyze-single-url", {
       url: url,
-      company_name: companyName
+      company_name: companyName,
     }),
 
   // 특정 URL에서 키워드 지원 여부 분석
   analyzeKeywordSupport: (url: string, keyword: string) =>
-    apiClient.post('/feature-detection/analyze-keyword-support', {
+    apiClient.post("/feature-detection/analyze-keyword-support", {
       url: url,
-      keyword: keyword
+      keyword: keyword,
     }),
 
   // 서비스 상태 확인
-  checkHealth: () => apiClient.get('/feature-detection/health'),
+  checkHealth: () => apiClient.get("/feature-detection/health"),
 
   // Vertex AI 연결 테스트
   testVertexAI: (testText: string) =>
-    apiClient.post('/feature-detection/test-vertex-ai', {
-      test_text: testText
+    apiClient.post("/feature-detection/test-vertex-ai", {
+      test_text: testText,
     }),
+};
+
+// Job 관리 API
+export const jobAPI = {
+  // Job 상태 조회
+  getJobStatus: (jobId: string) => apiClient.get(`/jobs/${jobId}`),
+
+  // 프로젝트의 모든 Job 조회
+  getProjectJobs: (projectId: number) =>
+    apiClient.get(`/projects/${projectId}/jobs`),
+
+  // Job 취소
+  cancelJob: (jobId: string) => apiClient.post(`/jobs/${jobId}/cancel`),
+
+  // Job 재시도
+  retryJob: (jobId: string) => apiClient.post(`/jobs/${jobId}/retry`),
 };
 
 // 리포트 API
