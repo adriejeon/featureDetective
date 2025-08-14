@@ -865,35 +865,6 @@ const CrawlingPage: React.FC = () => {
                             >
                               제품1 분석
                             </Typography>
-                            <Box
-                              sx={{
-                                display: "flex",
-                                gap: 2,
-                                mb: 2,
-                                flexWrap: "wrap",
-                              }}
-                            >
-                              <Chip
-                                label={`총 ${analysisSummary.competitor_analysis.total_features}개 기능`}
-                                color="primary"
-                                variant="outlined"
-                              />
-                              <Chip
-                                label={`문서 품질: ${analysisSummary.competitor_analysis.document_quality}`}
-                                color="success"
-                                variant="outlined"
-                              />
-                              {analysisSummary.competitor_analysis.main_categories?.map(
-                                (category: string, index: number) => (
-                                  <Chip
-                                    key={index}
-                                    label={`주요 카테고리: ${category}`}
-                                    color="secondary"
-                                    variant="outlined"
-                                  />
-                                )
-                              )}
-                            </Box>
                             {/* AI 제품 분석 결과 */}
                             {analysisSummary.competitor_product_analysis && (
                               <Box sx={{ mb: 2 }}>
@@ -1033,35 +1004,6 @@ const CrawlingPage: React.FC = () => {
                             >
                               제품2 분석
                             </Typography>
-                            <Box
-                              sx={{
-                                display: "flex",
-                                gap: 2,
-                                mb: 2,
-                                flexWrap: "wrap",
-                              }}
-                            >
-                              <Chip
-                                label={`총 ${analysisSummary.our_product_analysis.total_features}개 기능`}
-                                color="secondary"
-                                variant="outlined"
-                              />
-                              <Chip
-                                label={`문서 품질: ${analysisSummary.our_product_analysis.document_quality}`}
-                                color="success"
-                                variant="outlined"
-                              />
-                              {analysisSummary.our_product_analysis.main_categories?.map(
-                                (category: string, index: number) => (
-                                  <Chip
-                                    key={index}
-                                    label={`주요 카테고리: ${category}`}
-                                    color="primary"
-                                    variant="outlined"
-                                  />
-                                )
-                              )}
-                            </Box>
                             {/* AI 제품 분석 결과 */}
                             {analysisSummary.our_product_product_analysis && (
                               <Box sx={{ mb: 2 }}>
@@ -1197,35 +1139,6 @@ const CrawlingPage: React.FC = () => {
                             <Typography variant="h6" color="info" gutterBottom>
                               제품3 분석
                             </Typography>
-                            <Box
-                              sx={{
-                                display: "flex",
-                                gap: 2,
-                                mb: 2,
-                                flexWrap: "wrap",
-                              }}
-                            >
-                              <Chip
-                                label={`총 ${analysisSummary.third_product_analysis.total_features}개 기능`}
-                                color="info"
-                                variant="outlined"
-                              />
-                              <Chip
-                                label={`문서 품질: ${analysisSummary.third_product_analysis.document_quality}`}
-                                color="success"
-                                variant="outlined"
-                              />
-                              {analysisSummary.third_product_analysis.main_categories?.map(
-                                (category: string, index: number) => (
-                                  <Chip
-                                    key={index}
-                                    label={`주요 카테고리: ${category}`}
-                                    color="secondary"
-                                    variant="outlined"
-                                  />
-                                )
-                              )}
-                            </Box>
                             {/* AI 제품 분석 결과 */}
                             {analysisSummary.third_product_product_analysis && (
                               <Box sx={{ mb: 2 }}>
