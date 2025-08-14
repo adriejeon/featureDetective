@@ -130,10 +130,25 @@ class FeatureDetectionService:
             product_names = list(product_features.keys())
             competitor_features = product_features.get(product_names[0] if len(product_names) > 0 else '제품1', {})
             our_product_features = product_features.get(product_names[1] if len(product_names) > 1 else '제품2', {})
+            third_product_features = product_features.get(product_names[2] if len(product_names) > 2 else '제품3', {})
             
-            # 비교 분석 결과 생성
+            # 크롤링 결과에 기능 데이터 추가
+            for product_name in all_product_data.keys():
+                if product_name in product_features:
+                    all_product_data[product_name]['features'] = product_features[product_name]
+                else:
+                    all_product_data[product_name]['features'] = {
+                        'extracted_features': [],
+                        'analysis_summary': {
+                            'total_features': 0,
+                            'main_categories': [],
+                            'document_quality': 'low'
+                        }
+                    }
+            
+            # 비교 분석 결과 생성 (3개 제품 지원)
             comparison_analysis = self._generate_comparison_analysis(
-                competitor_features, our_product_features, merged_features, product_feature_mapping
+                competitor_features, our_product_features, merged_features, product_feature_mapping, third_product_features
             )
             
             result = {
@@ -512,12 +527,14 @@ class FeatureDetectionService:
             }
 
     def _generate_comparison_analysis(self, competitor_features: Dict, our_product_features: Dict, 
-                                    merged_features: List[Dict], product_feature_mapping: Dict) -> Dict[str, Any]:
-        """비교 분석 결과 생성"""
+                                    merged_features: List[Dict], product_feature_mapping: Dict, 
+                                    third_product_features: Dict = None) -> Dict[str, Any]:
+        """비교 분석 결과 생성 (3개 제품 지원)"""
         try:
             # 제품별 기능 수 계산
             competitor_feature_count = len(competitor_features.get('extracted_features', []))
             our_product_feature_count = len(our_product_features.get('extracted_features', []))
+            third_product_feature_count = len(third_product_features.get('extracted_features', [])) if third_product_features else 0
             
             # 공통 기능 수 계산
             common_features = 0
@@ -541,15 +558,18 @@ class FeatureDetectionService:
             comparison_summary = {
                 'total_features_product1': competitor_feature_count,
                 'total_features_product2': our_product_feature_count,
+                'total_features_product3': third_product_feature_count,
                 'common_features': common_features,
                 'product1_unique': competitor_feature_count - common_features,
-                'product2_unique': our_product_feature_count - common_features
+                'product2_unique': our_product_feature_count - common_features,
+                'product3_unique': third_product_feature_count - common_features if third_product_features else 0
             }
             
             # 경쟁 우위 분석
             competitive_analysis = {
                 'product1_advantages': [],
                 'product2_advantages': [],
+                'product3_advantages': [],
                 'recommendations': []
             }
             
@@ -557,29 +577,47 @@ class FeatureDetectionService:
             for feature in merged_features:
                 feature_name = feature.get('name', '')
                 if feature_name:
-                    # 제품1(경쟁사) 고유 기능
+                    # 제품1 고유 기능
                     if (feature_name in product_feature_mapping.get('제품1', {}) and 
                         product_feature_mapping['제품1'][feature_name].get('status') == 'O' and
-                        feature_name not in product_feature_mapping.get('제품2', {}) or
-                        product_feature_mapping['제품2'][feature_name].get('status') != 'O'):
+                        (feature_name not in product_feature_mapping.get('제품2', {}) or
+                        product_feature_mapping['제품2'][feature_name].get('status') != 'O') and
+                        (feature_name not in product_feature_mapping.get('제품3', {}) or
+                        product_feature_mapping['제품3'][feature_name].get('status') != 'O')):
                         competitive_analysis['product1_advantages'].append(feature_name)
                     
-                    # 제품2(우리 제품) 고유 기능
+                    # 제품2 고유 기능
                     if (feature_name in product_feature_mapping.get('제품2', {}) and 
                         product_feature_mapping['제품2'][feature_name].get('status') == 'O' and
-                        feature_name not in product_feature_mapping.get('제품1', {}) or
-                        product_feature_mapping['제품1'][feature_name].get('status') != 'O'):
+                        (feature_name not in product_feature_mapping.get('제품1', {}) or
+                        product_feature_mapping['제품1'][feature_name].get('status') != 'O') and
+                        (feature_name not in product_feature_mapping.get('제품3', {}) or
+                        product_feature_mapping['제품3'][feature_name].get('status') != 'O')):
                         competitive_analysis['product2_advantages'].append(feature_name)
+                    
+                    # 제품3 고유 기능 (3개 제품이 있는 경우)
+                    if third_product_features and (feature_name in product_feature_mapping.get('제품3', {}) and 
+                        product_feature_mapping['제품3'][feature_name].get('status') == 'O' and
+                        (feature_name not in product_feature_mapping.get('제품1', {}) or
+                        product_feature_mapping['제품1'][feature_name].get('status') != 'O') and
+                        (feature_name not in product_feature_mapping.get('제품2', {}) or
+                        product_feature_mapping['제품2'][feature_name].get('status') != 'O')):
+                        competitive_analysis['product3_advantages'].append(feature_name)
             
             # 개선 권장사항 생성
             if competitive_analysis['product1_advantages']:
                 competitive_analysis['recommendations'].append(
-                    f"경쟁사의 고유 기능 {len(competitive_analysis['product1_advantages'])}개를 분석하여 차별화 전략 수립 필요"
+                    f"제품1의 고유 기능 {len(competitive_analysis['product1_advantages'])}개를 분석하여 차별화 전략 수립 필요"
                 )
             
             if competitive_analysis['product2_advantages']:
                 competitive_analysis['recommendations'].append(
-                    f"우리 제품의 고유 기능 {len(competitive_analysis['product2_advantages'])}개를 강화하여 경쟁 우위 확보"
+                    f"제품2의 고유 기능 {len(competitive_analysis['product2_advantages'])}개를 강화하여 경쟁 우위 확보"
+                )
+            
+            if third_product_features and competitive_analysis['product3_advantages']:
+                competitive_analysis['recommendations'].append(
+                    f"제품3의 고유 기능 {len(competitive_analysis['product3_advantages'])}개를 참고하여 시장 동향 파악"
                 )
             
             if common_features > 0:
@@ -598,13 +636,16 @@ class FeatureDetectionService:
                 'comparison_summary': {
                     'total_features_product1': 0,
                     'total_features_product2': 0,
+                    'total_features_product3': 0,
                     'common_features': 0,
                     'product1_unique': 0,
-                    'product2_unique': 0
+                    'product2_unique': 0,
+                    'product3_unique': 0
                 },
                 'competitive_analysis': {
                     'product1_advantages': [],
                     'product2_advantages': [],
+                    'product3_advantages': [],
                     'recommendations': []
                 }
             }
