@@ -38,7 +38,8 @@ class FeatureDetectionService:
     async def detect_features_from_urls(self, 
                                       competitor_urls: List[str], 
                                       our_product_urls: List[str],
-                                      project_name: str = "기능 탐지 프로젝트") -> Dict[str, Any]:
+                                      project_name: str = "기능 탐지 프로젝트",
+                                      product_names: List[str] = None) -> Dict[str, Any]:
         """
         URL 목록에서 기능을 탐지하고 분석 (개선된 버전)
         
@@ -46,6 +47,7 @@ class FeatureDetectionService:
             competitor_urls: 경쟁사 URL 목록
             our_product_urls: 우리 제품 URL 목록
             project_name: 프로젝트 이름
+            product_names: 제품명 목록 (선택사항)
             
         Returns:
             통합 분석 결과
@@ -56,7 +58,14 @@ class FeatureDetectionService:
             
             # 모든 URL을 하나의 리스트로 통합 (다중 제품 분석)
             all_urls = competitor_urls + our_product_urls
-            product_names = [f"제품{i+1}" for i in range(len(all_urls))]
+            
+            # 제품명이 제공되지 않은 경우 기본값 사용
+            if product_names is None:
+                product_names = [f"제품{i+1}" for i in range(len(all_urls))]
+            elif len(product_names) < len(all_urls):
+                # 제품명이 부족한 경우 나머지는 기본값으로 채움
+                for i in range(len(product_names), len(all_urls)):
+                    product_names.append(f"제품{i+1}")
             
             # 1단계: 모든 제품 웹사이트 크롤링
             logger.info("모든 제품 웹사이트 크롤링 시작...")
@@ -159,7 +168,7 @@ class FeatureDetectionService:
             
             # 비교 분석 결과 생성 (3개 제품 지원)
             comparison_analysis = self._generate_comparison_analysis(
-                competitor_features, our_product_features, merged_features, product_feature_mapping, third_product_features
+                competitor_features, our_product_features, merged_features, product_feature_mapping, third_product_features, product_names
             )
             
             result = {
@@ -539,9 +548,16 @@ class FeatureDetectionService:
 
     def _generate_comparison_analysis(self, competitor_features: Dict, our_product_features: Dict, 
                                     merged_features: List[Dict], product_feature_mapping: Dict, 
-                                    third_product_features: Dict = None) -> Dict[str, Any]:
+                                    third_product_features: Dict = None, product_names: List[str] = None) -> Dict[str, Any]:
         """비교 분석 결과 생성 (3개 제품 지원)"""
         try:
+            # 제품명 처리
+            if product_names is None:
+                product_names = ['제품1', '제품2', '제품3']
+            elif len(product_names) < 3:
+                for i in range(len(product_names), 3):
+                    product_names.append(f'제품{i+1}')
+            
             # 제품별 기능 수 계산
             competitor_feature_count = len(competitor_features.get('extracted_features', []))
             our_product_feature_count = len(our_product_features.get('extracted_features', []))
@@ -573,7 +589,8 @@ class FeatureDetectionService:
                 'common_features': common_features,
                 'product1_unique': competitor_feature_count - common_features,
                 'product2_unique': our_product_feature_count - common_features,
-                'product3_unique': third_product_feature_count - common_features if third_product_features else 0
+                'product3_unique': third_product_feature_count - common_features if third_product_features else 0,
+                'product_names': product_names  # 실제 제품명 추가
             }
             
             # 경쟁 우위 분석
@@ -581,7 +598,8 @@ class FeatureDetectionService:
                 'product1_advantages': [],
                 'product2_advantages': [],
                 'product3_advantages': [],
-                'recommendations': []
+                'recommendations': [],
+                'product_names': product_names  # 실제 제품명 추가
             }
             
             # 각 제품의 고유 기능을 장점으로 추가
@@ -618,17 +636,17 @@ class FeatureDetectionService:
             # 개선 권장사항 생성
             if competitive_analysis['product1_advantages']:
                 competitive_analysis['recommendations'].append(
-                    f"제품1의 고유 기능 {len(competitive_analysis['product1_advantages'])}개를 분석하여 차별화 전략 수립 필요"
+                    f"{product_names[0]}의 고유 기능 {len(competitive_analysis['product1_advantages'])}개를 분석하여 차별화 전략 수립 필요"
                 )
             
             if competitive_analysis['product2_advantages']:
                 competitive_analysis['recommendations'].append(
-                    f"제품2의 고유 기능 {len(competitive_analysis['product2_advantages'])}개를 강화하여 경쟁 우위 확보"
+                    f"{product_names[1]}의 고유 기능 {len(competitive_analysis['product2_advantages'])}개를 강화하여 경쟁 우위 확보"
                 )
             
             if third_product_features and competitive_analysis['product3_advantages']:
                 competitive_analysis['recommendations'].append(
-                    f"제품3의 고유 기능 {len(competitive_analysis['product3_advantages'])}개를 참고하여 시장 동향 파악"
+                    f"{product_names[2]}의 고유 기능 {len(competitive_analysis['product3_advantages'])}개를 참고하여 시장 동향 파악"
                 )
             
             if common_features > 0:

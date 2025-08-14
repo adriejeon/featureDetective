@@ -46,6 +46,7 @@ def feature_detection_task(self, job_id: str, input_data: dict):
         competitor_urls = input_data.get('competitor_urls', [])
         our_product_urls = input_data.get('our_product_urls', [])
         project_name = input_data.get('project_name', '기능 탐지 프로젝트')
+        product_names = input_data.get('product_names', [])  # 제품명 목록 추가
         
         # 진행률 업데이트
         self.update_state(
@@ -106,6 +107,12 @@ def feature_detection_task(self, job_id: str, input_data: dict):
             all_urls = competitor_urls + our_product_urls
             total_urls = len(all_urls)
             
+            # 제품명 처리
+            if not product_names or len(product_names) < len(all_urls):
+                # 제품명이 부족한 경우 기본값으로 채움
+                for i in range(len(product_names) if product_names else 0, len(all_urls)):
+                    product_names.append(f"제품{i+1}")
+            
             all_product_data = {}
             for i, url in enumerate(all_urls):
                 try:
@@ -121,15 +128,15 @@ def feature_detection_task(self, job_id: str, input_data: dict):
                     crawled_data = loop.run_until_complete(
                         feature_service.crawler.crawl_website(url)
                     )
-                    all_product_data[f"제품{i+1}"] = {
+                    all_product_data[product_names[i]] = {
                         'url': url,
                         'data': crawled_data
                     }
-                    logger.info(f"제품 {i+1} 크롤링 완료: {url}")
+                    logger.info(f"{product_names[i]} 크롤링 완료: {url}")
                     
                 except Exception as e:
-                    logger.error(f"제품 {i+1} 크롤링 실패: {url}, 오류: {e}")
-                    all_product_data[f"제품{i+1}"] = {
+                    logger.error(f"{product_names[i]} 크롤링 실패: {url}, 오류: {e}")
+                    all_product_data[product_names[i]] = {
                         'url': url,
                         'data': []
                     }

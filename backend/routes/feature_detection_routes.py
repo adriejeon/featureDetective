@@ -43,6 +43,7 @@ def detect_features():
         competitor_urls = data.get('competitor_urls', [])
         our_product_urls = data.get('our_product_urls', [])
         project_name = data.get('project_name', '기능 탐지 프로젝트')
+        product_names = data.get('product_names', [])  # 제품명 목록 추가
         
         if not competitor_urls and not our_product_urls:
             return jsonify({'error': '최소 하나의 URL이 필요합니다.'}), 400
@@ -50,6 +51,7 @@ def detect_features():
         logger.info(f"기능 탐지 Job 요청: {project_name}")
         logger.info(f"경쟁사 URL: {competitor_urls}")
         logger.info(f"우리 제품 URL: {our_product_urls}")
+        logger.info(f"제품명: {product_names}")
         
         # Job 생성
         from models.job import Job
@@ -62,7 +64,8 @@ def detect_features():
         job.input_data = {
             'competitor_urls': competitor_urls,
             'our_product_urls': our_product_urls,
-            'project_name': project_name
+            'project_name': project_name,
+            'product_names': product_names  # 제품명 추가
         }
         
         db.session.add(job)
@@ -90,7 +93,8 @@ def detect_features():
                     feature_service.detect_features_from_urls(
                         competitor_urls, 
                         our_product_urls, 
-                        project_name
+                        project_name,
+                        product_names
                     )
                 )
             finally:

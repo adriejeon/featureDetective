@@ -180,6 +180,9 @@ const CrawlingPage: React.FC = () => {
   const [loadingCrawlingResults, setLoadingCrawlingResults] =
     React.useState(false);
   const [analysisSummary, setAnalysisSummary] = React.useState<any>(null);
+  const [actualProductNames, setActualProductNames] = React.useState<string[]>(
+    []
+  );
 
   const updateProduct = (
     index: number,
@@ -233,14 +236,19 @@ const CrawlingPage: React.FC = () => {
           (p) => p.name.trim() && p.url.trim()
         );
         const productUrls = validProducts.map((p) => p.url.trim());
+        const productNames = validProducts.map((p) => p.name.trim()); // 제품명 목록 추가
         const projectName = `다중 제품 비교 - ${validProducts
           .map((p) => p.name)
           .join(", ")}`;
 
+        // 실제 제품명 저장
+        setActualProductNames(productNames);
+
         const response = await featureDetectionAPI.detectFeatures(
           productUrls,
           [], // 우리 제품 URL은 비워둠 (모든 제품을 경쟁사로 취급)
-          projectName
+          projectName,
+          productNames // 제품명 목록 전달
         );
 
         const data = response.data;
@@ -368,21 +376,45 @@ const CrawlingPage: React.FC = () => {
             );
           }
 
-          // 기존 방식과의 호환성을 위해 competitor_features와 our_product_features도 유지
-          const competitorFeatures = allProductFeatures["제품1"] || [];
-          const ourProductFeatures = allProductFeatures["제품2"] || [];
-          const thirdProductFeatures = allProductFeatures["제품3"] || [];
+          // 백엔드에서 전달받은 제품명 사용
+          const backendProductNames =
+            analysisResults.comparison_analysis?.comparison_summary
+              ?.product_names ||
+            actualProductNames ||
+            validProducts.map((p) => p.name);
+
+          // 디버깅: 제품명 확인
+          console.log("=== 제품명 디버깅 ===");
+          console.log(
+            "validProducts:",
+            validProducts.map((p) => p.name)
+          );
+          console.log("actualProductNames:", actualProductNames);
+          console.log("backendProductNames:", backendProductNames);
+          console.log(
+            "comparison_summary:",
+            analysisResults.comparison_analysis?.comparison_summary
+          );
+
+          // 백엔드에서 받은 제품명을 사용하여 기능 데이터 매핑
+          const competitorFeatures =
+            allProductFeatures[backendProductNames[0]] || [];
+          const ourProductFeatures =
+            allProductFeatures[backendProductNames[1]] || [];
+          const thirdProductFeatures =
+            allProductFeatures[backendProductNames[2]] || [];
 
           // 제품3 AI 분석 결과 디버깅
           console.log("=== 제품3 AI 분석 결과 디버깅 ===");
           console.log("제품3 기능 수:", thirdProductFeatures.length);
           console.log(
             "제품3 AI 분석 결과:",
-            analysisResults.product_features?.제품3
+            analysisResults.product_features?.[backendProductNames[2]]
           );
           console.log(
             "제품3 제품 특성 분석:",
-            analysisResults.product_features?.제품3?.product_analysis
+            analysisResults.product_features?.[backendProductNames[2]]
+              ?.product_analysis
           );
 
           // 요약 정보 저장
@@ -406,8 +438,9 @@ const CrawlingPage: React.FC = () => {
               analysisResults.our_product_features?.product_analysis,
             // 제품3 관련 데이터 (3개 제품이 있는 경우)
             ...(validProducts.length >= 3 && {
-              third_product_analysis: analysisResults.product_features?.제품3
-                ?.analysis_summary || {
+              third_product_analysis: analysisResults.product_features?.[
+                backendProductNames[2]
+              ]?.analysis_summary || {
                 total_features: thirdProductFeatures.length,
                 main_categories: thirdProductFeatures
                   .map((f: any) => f.category)
@@ -415,8 +448,9 @@ const CrawlingPage: React.FC = () => {
                   .slice(0, 3),
                 document_quality: "high",
               },
-              third_product_product_analysis: analysisResults.product_features
-                ?.제품3?.product_analysis || {
+              third_product_product_analysis: analysisResults
+                .product_features?.[backendProductNames[2]]
+                ?.product_analysis || {
                 product_characteristics: {
                   product_type: "비즈니스 도구",
                   target_audience: "기업 사용자",
@@ -430,17 +464,18 @@ const CrawlingPage: React.FC = () => {
                 },
               },
             }),
+            backend_product_names: backendProductNames, // 백엔드 제품명 저장
           });
 
           // 각 제품의 기능 목록을 그대로 표시
           apiResults = [];
 
-          // 제품1 기능 목록
+          // 첫 번째 제품 기능 목록
           if (competitorFeatures.length > 0) {
             apiResults.push({
-              feature: "제품1 기능 목록",
+              feature: `${backendProductNames[0]} 기능 목록`,
               products: {
-                제품1: {
+                [backendProductNames[0]]: {
                   status: "O",
                   description: `총 ${competitorFeatures.length}개 기능 발견`,
                   link: validProducts[0]?.url || "",
@@ -454,9 +489,9 @@ const CrawlingPage: React.FC = () => {
           } else {
             // 기능이 없을 때도 표시
             apiResults.push({
-              feature: "제품1 기능 목록",
+              feature: `${backendProductNames[0]} 기능 목록`,
               products: {
-                제품1: {
+                [backendProductNames[0]]: {
                   status: "X",
                   description:
                     "기능을 찾을 수 없습니다. (AI 분석 중 오류가 발생했을 수 있습니다)",
@@ -470,12 +505,12 @@ const CrawlingPage: React.FC = () => {
             });
           }
 
-          // 제품2 기능 목록
+          // 두 번째 제품 기능 목록
           if (ourProductFeatures.length > 0) {
             apiResults.push({
-              feature: "제품2 기능 목록",
+              feature: `${backendProductNames[1]} 기능 목록`,
               products: {
-                제품2: {
+                [backendProductNames[1]]: {
                   status: "O",
                   description: `총 ${ourProductFeatures.length}개 기능 발견`,
                   link: validProducts[1]?.url || "",
@@ -489,9 +524,9 @@ const CrawlingPage: React.FC = () => {
           } else {
             // 기능이 없을 때도 표시
             apiResults.push({
-              feature: "제품2 기능 목록",
+              feature: `${backendProductNames[1]} 기능 목록`,
               products: {
-                제품2: {
+                [backendProductNames[1]]: {
                   status: "X",
                   description:
                     "기능을 찾을 수 없습니다. (AI 분석 중 오류가 발생했을 수 있습니다)",
@@ -505,13 +540,13 @@ const CrawlingPage: React.FC = () => {
             });
           }
 
-          // 제품3 기능 목록 (3개 제품이 입력된 경우)
+          // 세 번째 제품 기능 목록 (3개 제품이 입력된 경우)
           if (validProducts.length >= 3) {
             if (thirdProductFeatures.length > 0) {
               apiResults.push({
-                feature: "제품3 기능 목록",
+                feature: `${backendProductNames[2]} 기능 목록`,
                 products: {
-                  제품3: {
+                  [backendProductNames[2]]: {
                     status: "O",
                     description: `총 ${thirdProductFeatures.length}개 기능 발견`,
                     link: validProducts[2]?.url || "",
@@ -525,9 +560,9 @@ const CrawlingPage: React.FC = () => {
             } else {
               // 기능이 없을 때도 표시
               apiResults.push({
-                feature: "제품3 기능 목록",
+                feature: `${backendProductNames[2]} 기능 목록`,
                 products: {
-                  제품3: {
+                  [backendProductNames[2]]: {
                     status: "X",
                     description:
                       "기능을 찾을 수 없습니다. (AI 분석 중 오류가 발생했을 수 있습니다)",
@@ -709,24 +744,6 @@ const CrawlingPage: React.FC = () => {
         </CardContent>
       </Card>
 
-      <Card sx={{ mb: 3 }}>
-        <CardContent>
-          <Typography variant="h6" gutterBottom>
-            분석 방식 선택
-          </Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            Vertex AI를 사용하여 여러 제품의 도움말 페이지를 크롤링하고 기능을
-            자동으로 분석합니다.
-          </Typography>
-
-          <Alert severity="info">
-            자동 기능 탐지 모드: 입력한 제품들의 도움말 페이지를 크롤링하여
-            유사한 기능들을 자동으로 찾아 비교합니다. Vertex AI가 각 제품의
-            기능을 분석하고 요약해드립니다.
-          </Alert>
-        </CardContent>
-      </Card>
-
       <Box sx={{ mb: 3, display: "flex", gap: 2, flexWrap: "wrap" }}>
         <Button
           variant="contained"
@@ -738,26 +755,6 @@ const CrawlingPage: React.FC = () => {
         >
           {loading ? "분석 중..." : "다중 제품 기능 분석 시작"}
         </Button>
-
-        {!features.trim() && (
-          <>
-            <Button
-              variant="outlined"
-              size="large"
-              startIcon={
-                loadingCrawlingResults ? (
-                  <CircularProgress size={20} />
-                ) : (
-                  <VisibilityIcon />
-                )
-              }
-              onClick={handleGetCrawlingResults}
-              disabled={loadingCrawlingResults}
-            >
-              실제 크롤링
-            </Button>
-          </>
-        )}
       </Box>
 
       {/* 결과 탭 */}
@@ -822,7 +819,10 @@ const CrawlingPage: React.FC = () => {
                               }
                             </Typography>
                             <Typography variant="body2" color="text.secondary">
-                              제품1 총 기능
+                              {analysisSummary.backend_product_names?.[0] ||
+                                products[0]?.name ||
+                                "제품1"}{" "}
+                              총 기능
                             </Typography>
                           </Card>
                           <Card sx={{ p: 2, textAlign: "center" }}>
@@ -833,7 +833,10 @@ const CrawlingPage: React.FC = () => {
                               }
                             </Typography>
                             <Typography variant="body2" color="text.secondary">
-                              제품2 총 기능
+                              {analysisSummary.backend_product_names?.[1] ||
+                                products[1]?.name ||
+                                "제품2"}{" "}
+                              총 기능
                             </Typography>
                           </Card>
                           <Card sx={{ p: 2, textAlign: "center" }}>
@@ -863,7 +866,10 @@ const CrawlingPage: React.FC = () => {
                               color="primary"
                               gutterBottom
                             >
-                              제품1 분석
+                              {analysisSummary.backend_product_names?.[0] ||
+                                products[0]?.name ||
+                                "제품1"}{" "}
+                              분석
                             </Typography>
                             {/* AI 제품 분석 결과 */}
                             {analysisSummary.competitor_product_analysis && (
@@ -1002,7 +1008,10 @@ const CrawlingPage: React.FC = () => {
                               color="secondary"
                               gutterBottom
                             >
-                              제품2 분석
+                              {analysisSummary.backend_product_names?.[1] ||
+                                products[1]?.name ||
+                                "제품2"}{" "}
+                              분석
                             </Typography>
                             {/* AI 제품 분석 결과 */}
                             {analysisSummary.our_product_product_analysis && (
@@ -1137,7 +1146,10 @@ const CrawlingPage: React.FC = () => {
                         {analysisSummary.third_product_analysis && (
                           <Box sx={{ mb: 3 }}>
                             <Typography variant="h6" color="info" gutterBottom>
-                              제품3 분석
+                              {analysisSummary.backend_product_names?.[2] ||
+                                products[2]?.name ||
+                                "제품3"}{" "}
+                              분석
                             </Typography>
                             {/* AI 제품 분석 결과 */}
                             {analysisSummary.third_product_product_analysis && (
@@ -1274,7 +1286,10 @@ const CrawlingPage: React.FC = () => {
                               .product1_advantages?.length > 0 && (
                               <Box sx={{ mb: 2 }}>
                                 <Typography variant="subtitle2" gutterBottom>
-                                  제품1의 고유 장점:
+                                  {analysisSummary.backend_product_names?.[0] ||
+                                    products[0]?.name ||
+                                    "제품1"}
+                                  의 고유 장점:
                                 </Typography>
                                 <ul>
                                   {analysisSummary.competitive_analysis.product1_advantages.map(
@@ -1294,7 +1309,10 @@ const CrawlingPage: React.FC = () => {
                               .product2_advantages?.length > 0 && (
                               <Box sx={{ mb: 2 }}>
                                 <Typography variant="subtitle2" gutterBottom>
-                                  제품2의 고유 장점:
+                                  {analysisSummary.backend_product_names?.[1] ||
+                                    products[1]?.name ||
+                                    "제품2"}
+                                  의 고유 장점:
                                 </Typography>
                                 <ul>
                                   {analysisSummary.competitive_analysis.product2_advantages.map(
@@ -1314,7 +1332,10 @@ const CrawlingPage: React.FC = () => {
                               .product3_advantages?.length > 0 && (
                               <Box sx={{ mb: 2 }}>
                                 <Typography variant="subtitle2" gutterBottom>
-                                  제품3의 고유 장점:
+                                  {analysisSummary.backend_product_names?.[2] ||
+                                    products[2]?.name ||
+                                    "제품3"}
+                                  의 고유 장점:
                                 </Typography>
                                 <ul>
                                   {analysisSummary.competitive_analysis.product3_advantages.map(

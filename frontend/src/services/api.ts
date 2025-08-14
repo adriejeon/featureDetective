@@ -159,12 +159,14 @@ export const featureDetectionAPI = {
   detectFeatures: (
     competitorUrls: string[],
     ourProductUrls: string[],
-    projectName: string
+    projectName: string,
+    productNames?: string[]
   ) =>
     apiClient.post("/feature-detection/detect-features", {
       competitor_urls: competitorUrls,
       our_product_urls: ourProductUrls,
       project_name: projectName,
+      product_names: productNames || [], // 제품명 목록 추가
     }),
 
   // 단일 URL에서 기능 분석
