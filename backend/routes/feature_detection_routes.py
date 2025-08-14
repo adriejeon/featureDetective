@@ -11,6 +11,7 @@ from typing import List, Dict, Any
 import asyncio
 
 from services.feature_detection_service import FeatureDetectionService
+from extensions import db
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +25,7 @@ feature_service = FeatureDetectionService()
 @cross_origin()
 def detect_features():
     """
-    URL 목록에서 기능 탐지 및 분석
+    URL 목록에서 기능 탐지 및 분석 (비동기 Job 시스템)
     
     요청 형식:
     {
@@ -46,35 +47,97 @@ def detect_features():
         if not competitor_urls and not our_product_urls:
             return jsonify({'error': '최소 하나의 URL이 필요합니다.'}), 400
         
-        logger.info(f"기능 탐지 요청: {project_name}")
+        logger.info(f"기능 탐지 Job 요청: {project_name}")
         logger.info(f"경쟁사 URL: {competitor_urls}")
         logger.info(f"우리 제품 URL: {our_product_urls}")
         
-        # 비동기 함수 실행
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
+        # Job 생성
+        from models.job import Job
+        job = Job()
+        job.project_id = 1  # 기본 프로젝트 ID (실제로는 사용자 프로젝트 사용)
+        job.job_type = 'feature_detection'
+        job.status = 'pending'
+        job.progress = 0
+        job.current_step = '대기 중'
+        job.input_data = {
+            'competitor_urls': competitor_urls,
+            'our_product_urls': our_product_urls,
+            'project_name': project_name
+        }
         
+        db.session.add(job)
+        db.session.commit()
+        
+        # Celery 태스크 실행
         try:
-            result = loop.run_until_complete(
-                feature_service.detect_features_from_urls(
-                    competitor_urls, 
-                    our_product_urls, 
-                    project_name
+            from tasks.feature_detection_tasks import feature_detection_task
+            logger.info(f"Celery 태스크 시작: Job {job.id}")
+            task = feature_detection_task.delay(job.id, job.input_data)
+            logger.info(f"Celery 태스크 ID: {task.id}")
+        except Exception as celery_error:
+            logger.error(f"Celery 태스크 실행 오류: {celery_error}")
+            # Celery 연결 실패 시 동기적으로 실행
+            logger.info("Celery 연결 실패로 동기 실행으로 전환")
+            from services.feature_detection_service import FeatureDetectionService
+            feature_service = FeatureDetectionService()
+            
+            # 비동기 함수를 동기적으로 실행
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            
+            try:
+                result = loop.run_until_complete(
+                    feature_service.detect_features_from_urls(
+                        competitor_urls, 
+                        our_product_urls, 
+                        project_name
+                    )
                 )
-            )
-        finally:
-            loop.close()
+            finally:
+                loop.close()
+            
+            # Job 완료로 표시
+            job.status = 'completed'
+            job.progress = 100
+            job.current_step = '완료'
+            job.result_data = result
+            db.session.commit()
+            
+            # 웹소켓으로 완료 알림 전송
+            try:
+                from websocket_server import websocket_manager
+                websocket_manager.emit_job_completed(job.id, {
+                    'success': True,
+                    'data': result,
+                    'message': '기능 탐지가 완료되었습니다.'
+                })
+                logger.info(f"웹소켓 완료 알림 전송: Job {job.id}")
+            except Exception as ws_error:
+                logger.error(f"웹소켓 알림 전송 실패: {ws_error}")
+            
+            return jsonify({
+                'success': True,
+                'message': '기능 탐지가 완료되었습니다.',
+                'data': result
+            }), 200
         
-        if result.get('error'):
-            return jsonify(result), 500
+        # Job에 Celery 태스크 ID 저장
+        job.celery_task_id = task.id
+        db.session.commit()
         
         return jsonify({
             'success': True,
-            'data': result
-        }), 200
+            'message': '기능 탐지가 시작되었습니다.',
+            'data': {
+                'job_id': job.id,
+                'status': job.status,
+                'progress': job.progress,
+                'current_step': job.current_step
+            }
+        }), 202
         
     except Exception as e:
-        logger.error(f"기능 탐지 API 오류: {e}")
+        logger.error(f"기능 탐지 Job 생성 오류: {e}")
         return jsonify({
             'error': str(e),
             'success': False

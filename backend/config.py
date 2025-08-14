@@ -1,14 +1,9 @@
 import os
 from datetime import timedelta
-from dotenv import load_dotenv
-
-load_dotenv()
 
 class Config:
     """기본 설정 클래스"""
-    SECRET_KEY = os.environ.get('SECRET_KEY') or 'dev-secret-key'
-    
-    # SQLite 데이터베이스 설정
+    SECRET_KEY = os.environ.get('SECRET_KEY') or 'dev-secret-key-change-in-production'
     SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or 'sqlite:///feature_detective.db'
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     
@@ -24,7 +19,7 @@ class Config:
     CELERY_RESULT_BACKEND = os.environ.get('CELERY_RESULT_BACKEND') or 'redis://localhost:6379/0'
     
     # 크롤링 설정
-    CRAWLING_DELAY = 2  # 초
+    CRAWLING_DELAY = 1  # 초
     CRAWLING_TIMEOUT = 30  # 초
     MAX_RETRIES = 3
     

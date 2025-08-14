@@ -2,6 +2,7 @@ from flask import Flask, jsonify
 from flask_cors import CORS
 from config import Config
 from extensions import db
+from websocket_server import websocket_manager
 
 # 모델 import
 from models.project import Project
@@ -9,6 +10,7 @@ from models.keyword import Keyword
 from models.crawling_result import CrawlingResult
 from models.feature_analysis import FeatureAnalysis
 from models.ai_analysis import AIAnalysis, ExtractedFeature, ProductComparison
+from models.job import Job
 
 def create_app(config_class=Config):
     """애플리케이션 팩토리 패턴"""
@@ -19,6 +21,9 @@ def create_app(config_class=Config):
     db.init_app(app)
     CORS(app, origins=['http://127.0.0.1:3000', 'http://localhost:3000'], supports_credentials=True)
     
+    # 웹소켓 초기화
+    websocket_manager.init_app(app)
+    
     # 블루프린트 등록
     from routes.project_routes import project_bp
     from routes.keyword_routes import keyword_bp
@@ -28,6 +33,7 @@ def create_app(config_class=Config):
     from routes.auto_discovery_routes import auto_discovery_bp
     from routes.ai_analysis_routes import ai_analysis_bp
     from routes.feature_detection_routes import feature_detection_bp
+    from routes.job_routes import job_bp
     
     app.register_blueprint(project_bp, url_prefix='/api/projects')
     app.register_blueprint(keyword_bp, url_prefix='/api/keywords')
@@ -37,6 +43,7 @@ def create_app(config_class=Config):
     app.register_blueprint(auto_discovery_bp, url_prefix='/api/auto-discovery')
     app.register_blueprint(ai_analysis_bp, url_prefix='/api/ai')
     app.register_blueprint(feature_detection_bp, url_prefix='/api/feature-detection')
+    app.register_blueprint(job_bp, url_prefix='/api')
     
     # 헬스체크 엔드포인트
     @app.route('/api/health')

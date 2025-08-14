@@ -1,5 +1,5 @@
 """
-Vertex AI Gemini를 사용한 의미 분석 서비스
+개선된 Vertex AI Gemini 서비스 - 효율적인 기능 분석 및 중복 제거
 """
 
 import json
@@ -8,13 +8,16 @@ from typing import Dict, List, Any, Optional
 from google import genai
 from google.genai import types
 import os
+import re
+from collections import defaultdict
+from difflib import SequenceMatcher
 
 logger = logging.getLogger(__name__)
 
 
 class VertexAIService:
     """
-    Vertex AI Gemini를 사용한 텍스트 분석 서비스
+    개선된 Vertex AI Gemini 서비스
     """
     
     def __init__(self, project_id: str = None, location: str = None):
@@ -30,7 +33,7 @@ class VertexAIService:
         self.project_id = project_id or os.getenv('VERTEX_AI_PROJECT_ID', 'groobee-ai')
         self.location = location or os.getenv('VERTEX_AI_LOCATION', 'global')
         self.client = None
-        self.model = os.getenv('VERTEX_AI_MODEL', 'gemini-2.5-flash-lite')
+        self.model = os.getenv('VERTEX_AI_MODEL', 'gemini-2.5-pro')
         
         try:
             self.client = genai.Client(
@@ -43,409 +46,307 @@ class VertexAIService:
             logger.error(f"Vertex AI 클라이언트 초기화 실패: {e}")
             raise
     
-    def extract_features_from_text(self, company_name: str, help_text: str) -> Dict[str, Any]:
+    def extract_features_from_text(self, company_name: str, help_text: str, source_url: str = "") -> Dict[str, Any]:
         """
         도움말 텍스트에서 세부적인 제품 기능을 추출하고 한국어로 번역
         
         Args:
             company_name: 회사명
             help_text: 분석할 도움말 텍스트
+            source_url: 소스 URL
             
         Returns:
             추출된 기능 정보 딕셔너리
         """
         try:
-            # 프롬프트 템플릿
-            prompt_text = f"""다음은 {company_name}의 제품 도움말 문서입니다. 이 텍스트에서 세부적인 제품 기능들을 추출하고 분류해주세요.
+            # 텍스트 길이 제한 (토큰 절약)
+            if len(help_text) > 3000:
+                help_text = help_text[:3000] + "..."
+            
+            # 간단하고 명확한 프롬프트
+            prompt_text = f"""다음 문서에서 제품 기능을 추출하세요:
 
-=== 도움말 문서 내용 ===
 {help_text}
 
-=== 분석 요청 ===
-위 문서에서 구체적이고 세부적인 제품 기능을 추출하여 다음 JSON 형식으로 응답해주세요:
-
+JSON 형식으로 응답:
 {{
   "extracted_features": [
     {{
-      "name": "세부 기능명 (예: 챗봇 디자인 커스터마이징, PDF 내보내기, 실시간 알림 설정 등)",
-      "category": "UI_UX|보안|통합|성능|관리|분석|커뮤니케이션|파일관리|알림|기타",
-      "description": "기능에 대한 상세한 한국어 설명 (영어인 경우 한국어로 번역)",
-      "confidence": "추출 신뢰도 (0.0-1.0)",
-      "granularity": "기능의 세부 수준 (high/medium/low)"
+      "name": "기능명",
+      "category": "기타",
+      "description": "기능 설명",
+      "confidence": 0.9,
+      "granularity": "medium"
     }}
-  ],
-  "analysis_summary": {{
-    "total_features": "추출된 기능 수",
-    "main_categories": ["주요 카테고리들"],
-    "document_quality": "문서 품질 평가 (high/medium/low)",
-    "translation_notes": "번역 관련 참고사항"
-  }}
-}}
+  ]
+}}"""
 
-추출 기준:
-1. 페이지 단위가 아닌 구체적인 기능 단위로 추출
-2. 마케팅 문구나 일반적인 설명은 제외
-3. 실제 사용자가 활용할 수 있는 세부 기능만 추출
-4. 영어 설명은 한국어로 번역
-5. 기능의 세부 수준을 고려하여 분류
-
-예시 기능들:
-- 챗봇 디자인 커스터마이징
-- PDF 내보내기
-- 실시간 알림 설정
-- 파일 업로드 크기 제한
-- 사용자 권한 관리
-- API 연동 설정
-- 데이터 백업 스케줄링"""
-
-            # 시스템 지시사항
-            system_instruction = """당신은 제품 기능 분석 및 번역 전문가입니다.
-도움말 문서에서 세부적이고 구체적인 제품 기능을 정확히 추출하고 한국어로 번역하는 것이 전문 분야입니다.
-
-분석 방법:
-1. 페이지 단위가 아닌 구체적인 기능 단위로 추출
-2. 실제 사용자가 활용할 수 있는 세부 기능만 추출
-3. 마케팅 문구나 일반적인 설명은 제외
-4. 영어 설명은 자연스러운 한국어로 번역
-5. 기능의 세부 수준을 고려하여 분류
-
-추출 기준:
-- 구체적이고 측정 가능한 세부 기능
-- 사용자가 실제로 설정하거나 사용할 수 있는 기능
-- 제품의 핵심 가치를 제공하는 기능
-- 기술적으로 구현 가능한 기능
-- 기능의 세부 수준을 고려 (high: 매우 세부적, medium: 중간, low: 일반적)
-
-번역 기준:
-- 영어 설명을 자연스러운 한국어로 번역
-- 기술 용어는 적절한 한국어 용어 사용
-- 문맥을 고려한 정확한 번역
-- 사용자가 이해하기 쉬운 표현 사용
-
-정확하고 실용적인 분석과 번역을 제공하세요."""
-
-            # 생성 설정
-            generate_config = types.GenerateContentConfig(
-                temperature=0.3,  # 더 일관된 결과를 위해 낮은 온도
-                top_p=0.95,
-                max_output_tokens=65535,
-                safety_settings=[
-                    types.SafetySetting(category="HARM_CATEGORY_HATE_SPEECH", threshold="OFF"),
-                    types.SafetySetting(category="HARM_CATEGORY_DANGEROUS_CONTENT", threshold="OFF"),
-                    types.SafetySetting(category="HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold="OFF"),
-                    types.SafetySetting(category="HARM_CATEGORY_HARASSMENT", threshold="OFF")
-                ],
-                system_instruction=[types.Part.from_text(text=system_instruction)],
-                thinking_config=types.ThinkingConfig(thinking_budget=0),
-            )
-
-            # 콘텐츠 생성
-            contents = [
-                types.Content(
-                    role="user",
-                    parts=[types.Part.from_text(text=prompt_text)]
-                )
-            ]
-
-            # 응답 생성
+            # Vertex AI 호출 (올바른 API 사용)
             response = self.client.models.generate_content(
                 model=self.model,
-                contents=contents,
-                config=generate_config,
+                contents=prompt_text,
+                config=types.GenerateContentConfig(
+                    temperature=0.1,
+                    max_output_tokens=2048,
+                )
             )
-
-            # JSON 파싱
-            response_text = response.text
-            logger.info(f"Vertex AI 응답: {response_text[:200]}...")
             
-            # JSON 추출 (```json 블록이 있는 경우)
-            if "```json" in response_text:
-                json_start = response_text.find("```json") + 7
-                json_end = response_text.find("```", json_start)
-                response_text = response_text[json_start:json_end].strip()
+            # 응답 파싱 (개선된 버전)
+            response_text = response.text.strip()
+            logger.info(f"Vertex AI 원본 응답: {response_text[:200]}...")
             
-            result = json.loads(response_text)
-            logger.info(f"기능 추출 완료: {len(result.get('extracted_features', []))}개 기능")
+            # JSON 추출 시도
+            try:
+                # ```json 블록에서 추출
+                if "```json" in response_text:
+                    json_start = response_text.find("```json") + 7
+                    json_end = response_text.find("```", json_start)
+                    if json_end != -1:
+                        response_text = response_text[json_start:json_end].strip()
+                elif "```" in response_text:
+                    json_start = response_text.find("```") + 3
+                    json_end = response_text.find("```", json_start)
+                    if json_end != -1:
+                        response_text = response_text[json_start:json_end].strip()
+                
+                # JSON 파싱
+                result = json.loads(response_text)
+                
+            except json.JSONDecodeError as e:
+                logger.error(f"JSON 파싱 실패: {e}")
+                logger.error(f"파싱 시도한 텍스트: {response_text}")
+                
+                # 폴백: 간단한 기능 추출
+                result = self._fallback_feature_extraction(company_name, help_text, source_url)
+            
+            # 결과 검증 및 정리
+            if 'extracted_features' in result:
+                result['extracted_features'] = self._clean_and_validate_features(
+                    result['extracted_features'], source_url
+                )
             
             return result
             
-        except json.JSONDecodeError as e:
-            logger.error(f"JSON 파싱 오류: {e}")
-            logger.error(f"응답 텍스트: {response_text}")
-            return {
-                "extracted_features": [],
-                "analysis_summary": {
-                    "total_features": 0,
-                    "main_categories": [],
-                    "document_quality": "low",
-                    "error": "JSON 파싱 실패"
-                }
-            }
         except Exception as e:
-            logger.error(f"기능 추출 중 오류: {e}")
+            logger.error(f"기능 추출 오류: {e}")
             return {
-                "extracted_features": [],
-                "analysis_summary": {
-                    "total_features": 0,
-                    "main_categories": [],
-                    "document_quality": "low",
-                    "error": str(e)
-                }
+                'extracted_features': [],
+                'error': str(e)
             }
     
-    def compare_products(self, product1_name: str, product1_features: List[Dict], 
-                        product2_name: str, product2_features: List[Dict]) -> Dict[str, Any]:
+    def _clean_and_validate_features(self, features: List[Dict], source_url: str) -> List[Dict]:
+        """기능 목록 정리 및 검증"""
+        cleaned_features = []
+        
+        for feature in features:
+            if not isinstance(feature, dict):
+                continue
+                
+            # 필수 필드 확인
+            if 'name' not in feature or not feature['name']:
+                continue
+            
+            # 기본값 설정
+            cleaned_feature = {
+                'name': feature.get('name', '').strip(),
+                'category': feature.get('category', '기타'),
+                'description': feature.get('description', '').strip(),
+                'confidence': min(1.0, max(0.0, float(feature.get('confidence', 0.8)))),
+                'granularity': feature.get('granularity', 'medium'),
+                'source_url': source_url
+            }
+            
+            # 설명이 없으면 이름으로 대체
+            if not cleaned_feature['description']:
+                cleaned_feature['description'] = cleaned_feature['name']
+            
+            cleaned_features.append(cleaned_feature)
+        
+        return cleaned_features[:20]  # 최대 20개만 반환
+    
+    def merge_and_deduplicate_features(self, all_features: List[Dict]) -> List[Dict]:
+        """여러 제품의 기능을 병합하고 중복 제거"""
+        if not all_features:
+            return []
+        
+        # 기능명 기준으로 그룹화
+        feature_groups = defaultdict(list)
+        
+        for feature in all_features:
+            if 'name' not in feature:
+                continue
+            
+            # 기능명 정규화 (대소문자, 공백 등)
+            normalized_name = self._normalize_feature_name(feature['name'])
+            feature_groups[normalized_name].append(feature)
+        
+        # 중복 제거 및 병합
+        merged_features = []
+        
+        for normalized_name, features in feature_groups.items():
+            if len(features) == 1:
+                # 단일 기능
+                merged_features.append(features[0])
+            else:
+                # 중복 기능 - 가장 좋은 설명 선택
+                best_feature = self._select_best_feature(features)
+                merged_features.append(best_feature)
+        
+        return merged_features
+    
+    def _normalize_feature_name(self, name: str) -> str:
+        """기능명 정규화"""
+        # 소문자 변환
+        normalized = name.lower().strip()
+        
+        # 공백 정규화
+        normalized = re.sub(r'\s+', ' ', normalized)
+        
+        # 특수문자 제거
+        normalized = re.sub(r'[^\w\s가-힣]', '', normalized)
+        
+        return normalized
+    
+    def _select_best_feature(self, features: List[Dict]) -> Dict:
+        """가장 좋은 기능 설명 선택"""
+        if not features:
+            return {}
+        
+        # 신뢰도가 높고 설명이 긴 것을 우선
+        best_feature = max(features, key=lambda x: (
+            float(x.get('confidence', 0)),
+            len(x.get('description', ''))
+        ))
+        
+        return best_feature
+    
+    def analyze_product_comparison(self, competitor_features: List[Dict], our_product_features: List[Dict]) -> Dict[str, Any]:
         """
-        두 제품의 기능을 비교 분석
+        제품 간 기능 비교 분석
         
         Args:
-            product1_name: 첫 번째 제품명
-            product1_features: 첫 번째 제품의 기능 리스트
-            product2_name: 두 번째 제품명
-            product2_features: 두 번째 제품의 기능 리스트
+            competitor_features: 경쟁사 기능 목록
+            our_product_features: 우리 제품 기능 목록
             
         Returns:
             비교 분석 결과
         """
         try:
-            # 기능 리스트를 JSON 문자열로 변환
-            features1_json = json.dumps(product1_features, ensure_ascii=False, indent=2)
-            features2_json = json.dumps(product2_features, ensure_ascii=False, indent=2)
+            # 기능명 정규화
+            competitor_names = {self._normalize_feature_name(f['name']): f for f in competitor_features}
+            our_names = {self._normalize_feature_name(f['name']): f for f in our_product_features}
             
-            prompt_text = f"""다음은 두 제품의 기능 비교 분석 요청입니다.
-
-=== {product1_name}의 기능 ===
-{features1_json}
-
-=== {product2_name}의 기능 ===
-{features2_json}
-
-=== 비교 분석 요청 ===
-두 제품의 기능을 비교하여 다음 JSON 형식으로 분석 결과를 제공해주세요:
-
-{{
-  "comparison_summary": {{
-    "total_features_product1": "첫 번째 제품의 총 기능 수",
-    "total_features_product2": "두 번째 제품의 총 기능 수",
-    "common_features": "공통 기능 수",
-    "unique_features_product1": "첫 번째 제품만의 고유 기능 수",
-    "unique_features_product2": "두 번째 제품만의 고유 기능 수"
-  }},
-  "feature_comparison": [
-    {{
-      "feature_name": "기능명",
-      "product1_support": "첫 번째 제품 지원 여부 (true/false)",
-      "product2_support": "두 번째 제품 지원 여부 (true/false)",
-      "comparison_type": "common|unique_product1|unique_product2",
-      "significance": "기능의 중요도 (high/medium/low)"
-    }}
-  ],
-  "competitive_analysis": {{
-    "product1_advantages": ["첫 번째 제품의 장점들"],
-    "product2_advantages": ["두 번째 제품의 장점들"],
-    "market_positioning": "시장 포지셔닝 분석",
-    "recommendations": ["개선 권장사항들"]
-  }}
-}}"""
-
-            # 시스템 지시사항
-            system_instruction = """당신은 경쟁사 분석 전문가입니다.
-두 제품의 기능을 비교하여 경쟁 우위와 갭을 분석하는 것이 전문 분야입니다.
-
-분석 방법:
-1. 서로 다른 표현이지만 동일한 기능인지 의미론적으로 판단
-2. 각 제품의 고유 기능과 공통 기능을 구분
-3. 기능 격차를 객관적으로 평가
-4. UX 리서치 관점에서 실용적인 인사이트 제공
-
-비교 기준:
-- 기능의 본질적 목적과 사용자 가치로 판단
-- 단순 키워드 매칭이 아닌 의미 기반 비교
-- 사용자 경험 관점에서 기능의 중요도 고려
-- 시장 표준 대비 혁신성 평가
-
-객관적이고 균형잡힌 분석을 제공하세요."""
-
-            # 생성 설정
-            generate_config = types.GenerateContentConfig(
-                temperature=0.3,
-                top_p=0.95,
-                max_output_tokens=65535,
-                safety_settings=[
-                    types.SafetySetting(category="HARM_CATEGORY_HATE_SPEECH", threshold="OFF"),
-                    types.SafetySetting(category="HARM_CATEGORY_DANGEROUS_CONTENT", threshold="OFF"),
-                    types.SafetySetting(category="HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold="OFF"),
-                    types.SafetySetting(category="HARM_CATEGORY_HARASSMENT", threshold="OFF")
-                ],
-                system_instruction=[types.Part.from_text(text=system_instruction)],
-                thinking_config=types.ThinkingConfig(thinking_budget=0),
-            )
-
-            # 콘텐츠 생성
-            contents = [
-                types.Content(
-                    role="user",
-                    parts=[types.Part.from_text(text=prompt_text)]
-                )
-            ]
-
-            # 응답 생성
-            response = self.client.models.generate_content(
-                model=self.model,
-                contents=contents,
-                config=generate_config,
-            )
-
-            # JSON 파싱
-            response_text = response.text
-            logger.info(f"제품 비교 분석 완료")
+            # 비교 분석
+            comparison_results = []
             
-            # JSON 추출
-            if "```json" in response_text:
-                json_start = response_text.find("```json") + 7
-                json_end = response_text.find("```", json_start)
-                response_text = response_text[json_start:json_end].strip()
+            # 모든 기능에 대해 비교
+            all_features = set(competitor_names.keys()) | set(our_names.keys())
             
-            result = json.loads(response_text)
-            return result
-            
-        except json.JSONDecodeError as e:
-            logger.error(f"제품 비교 JSON 파싱 오류: {e}")
-            return {
-                "comparison_summary": {},
-                "feature_comparison": [],
-                "competitive_analysis": {
-                    "error": "JSON 파싱 실패"
+            for feature_name in all_features:
+                competitor_feature = competitor_names.get(feature_name)
+                our_feature = our_names.get(feature_name)
+                
+                comparison = {
+                    'feature_name': feature_name,
+                    'competitor_has': competitor_feature is not None,
+                    'our_product_has': our_feature is not None,
+                    'competitor_description': competitor_feature.get('description', '') if competitor_feature else '',
+                    'our_product_description': our_feature.get('description', '') if our_feature else '',
+                    'competitor_url': competitor_feature.get('source_url', '') if competitor_feature else '',
+                    'our_product_url': our_feature.get('source_url', '') if our_feature else '',
                 }
+                
+                comparison_results.append(comparison)
+            
+            return {
+                'comparison_results': comparison_results,
+                'total_features': len(all_features),
+                'competitor_unique': len(set(competitor_names.keys()) - set(our_names.keys())),
+                'our_product_unique': len(set(our_names.keys()) - set(competitor_names.keys())),
+                'common_features': len(set(competitor_names.keys()) & set(our_names.keys()))
             }
+            
         except Exception as e:
-            logger.error(f"제품 비교 분석 중 오류: {e}")
+            logger.error(f"제품 비교 분석 오류: {e}")
             return {
-                "comparison_summary": {},
-                "feature_comparison": [],
-                "competitive_analysis": {
-                    "error": str(e)
-                }
+                'comparison_results': [],
+                'error': str(e)
             }
     
-    def analyze_keyword_support(self, keyword: str, help_text: str) -> Dict[str, Any]:
-        """
-        특정 키워드의 지원 여부를 AI로 분석
+    def generate_feature_summary(self, features: List[Dict]) -> Dict[str, Any]:
+        """기능 요약 생성"""
+        if not features:
+            return {'summary': '분석된 기능이 없습니다.'}
         
-        Args:
-            keyword: 분석할 키워드
-            help_text: 도움말 텍스트
-            
-        Returns:
-            키워드 지원 분석 결과
-        """
         try:
-            prompt_text = f"""다음 키워드가 도움말 문서에서 지원되는지 분석해주세요.
-
-=== 분석할 키워드 ===
-{keyword}
-
-=== 도움말 문서 내용 ===
-{help_text}
-
-=== 분석 요청 ===
-위 키워드의 지원 여부를 다음 JSON 형식으로 분석해주세요:
-
-{{
-  "keyword": "{keyword}",
-  "support_status": "O|X|△",
-  "confidence_score": "신뢰도 점수 (0.0-1.0)",
-  "matched_text": "매칭된 텍스트 내용",
-  "analysis_reason": "지원 여부 판단 근거",
-  "related_features": ["관련된 기능들"],
-  "limitations": ["제한사항이나 조건들"]
-}}
-
-분석 기준:
-- O: 명확하게 지원됨
-- X: 명확하게 지원되지 않음
-- △: 부분적으로 지원되거나 조건부 지원"""
-
-            # 시스템 지시사항
-            system_instruction = """당신은 제품 기능 분석 전문가입니다.
-도움말 문서에서 특정 기능의 지원 여부를 정확히 판단하는 것이 전문 분야입니다.
-
-분석 방법:
-1. 키워드와 직접적으로 관련된 내용을 찾기
-2. 유사한 표현이나 동의어도 고려
-3. 부정적인 표현이나 제한사항 확인
-4. 맥락을 고려한 종합적 판단
-
-판단 기준:
-- 명시적 언급이 있는 경우
-- 유사한 기능이나 대안이 있는 경우
-- 제한사항이나 조건이 있는 경우
-- 전혀 언급되지 않는 경우
-
-정확하고 객관적인 분석을 제공하세요."""
-
-            # 생성 설정
-            generate_config = types.GenerateContentConfig(
-                temperature=0.2,
-                top_p=0.95,
-                max_output_tokens=2048,
-                safety_settings=[
-                    types.SafetySetting(category="HARM_CATEGORY_HATE_SPEECH", threshold="OFF"),
-                    types.SafetySetting(category="HARM_CATEGORY_DANGEROUS_CONTENT", threshold="OFF"),
-                    types.SafetySetting(category="HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold="OFF"),
-                    types.SafetySetting(category="HARM_CATEGORY_HARASSMENT", threshold="OFF")
-                ],
-                system_instruction=[types.Part.from_text(text=system_instruction)],
-                thinking_config=types.ThinkingConfig(thinking_budget=0),
-            )
-
-            # 콘텐츠 생성
-            contents = [
-                types.Content(
-                    role="user",
-                    parts=[types.Part.from_text(text=prompt_text)]
-                )
-            ]
-
-            # 응답 생성
-            response = self.client.models.generate_content(
-                model=self.model,
-                contents=contents,
-                config=generate_config,
-            )
-
-            # JSON 파싱
-            response_text = response.text
-            logger.info(f"키워드 분석 완료: {keyword}")
+            # 카테고리별 분류
+            categories = defaultdict(list)
+            for feature in features:
+                category = feature.get('category', '기타')
+                categories[category].append(feature)
             
-            # JSON 추출
-            if "```json" in response_text:
-                json_start = response_text.find("```json") + 7
-                json_end = response_text.find("```", json_start)
-                response_text = response_text[json_start:json_end].strip()
-            
-            result = json.loads(response_text)
-            return result
-            
-        except json.JSONDecodeError as e:
-            logger.error(f"키워드 분석 JSON 파싱 오류: {e}")
-            return {
-                "keyword": keyword,
-                "support_status": "X",
-                "confidence_score": 0.0,
-                "matched_text": "",
-                "analysis_reason": "JSON 파싱 실패",
-                "related_features": [],
-                "limitations": []
+            # 요약 생성
+            summary = {
+                'total_features': len(features),
+                'categories': dict(categories),
+                'main_categories': list(categories.keys()),
+                'high_granularity_count': len([f for f in features if f.get('granularity') == 'high']),
+                'average_confidence': sum(f.get('confidence', 0) for f in features) / len(features)
             }
+            
+            return summary
+            
         except Exception as e:
-            logger.error(f"키워드 분석 중 오류: {e}")
+            logger.error(f"기능 요약 생성 오류: {e}")
+            return {'error': str(e)}
+    
+    def _fallback_feature_extraction(self, company_name: str, help_text: str, source_url: str) -> Dict[str, Any]:
+        """JSON 파싱 실패 시 폴백 기능 추출"""
+        try:
+            # 간단한 키워드 기반 기능 추출
+            feature_keywords = [
+                '설정', '관리', '업로드', '다운로드', '검색', '필터', '정렬', '내보내기', '가져오기',
+                '알림', '메시지', '채팅', '통화', '화상', '회의', '파일', '공유', '권한', '보안',
+                '백업', '복원', '동기화', '연동', 'API', '웹훅', '자동화', '스케줄', '템플릿',
+                '설정', '관리', 'upload', 'download', 'search', 'filter', 'sort', 'export', 'import',
+                'notification', 'message', 'chat', 'call', 'video', 'meeting', 'file', 'share', 'permission', 'security',
+                'backup', 'restore', 'sync', 'integration', 'api', 'webhook', 'automation', 'schedule', 'template'
+            ]
+            
+            extracted_features = []
+            help_text_lower = help_text.lower()
+            
+            for keyword in feature_keywords:
+                if keyword.lower() in help_text_lower:
+                    # 키워드 주변 텍스트 추출
+                    keyword_pos = help_text_lower.find(keyword.lower())
+                    start = max(0, keyword_pos - 50)
+                    end = min(len(help_text), keyword_pos + len(keyword) + 50)
+                    context = help_text[start:end].strip()
+                    
+                    extracted_features.append({
+                        'name': keyword,
+                        'category': '기타',
+                        'description': f'{keyword} 관련 기능: {context}',
+                        'confidence': 0.7,
+                        'granularity': 'medium',
+                        'source_url': source_url
+                    })
+            
+            # 중복 제거
+            unique_features = []
+            seen_names = set()
+            for feature in extracted_features:
+                if feature['name'] not in seen_names:
+                    unique_features.append(feature)
+                    seen_names.add(feature['name'])
+            
             return {
-                "keyword": keyword,
-                "support_status": "X",
-                "confidence_score": 0.0,
-                "matched_text": "",
-                "analysis_reason": str(e),
-                "related_features": [],
-                "limitations": []
+                'extracted_features': unique_features[:10]  # 최대 10개만
+            }
+            
+        except Exception as e:
+            logger.error(f"폴백 기능 추출 오류: {e}")
+            return {
+                'extracted_features': []
             }

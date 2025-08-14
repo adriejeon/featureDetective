@@ -1,9 +1,12 @@
 from flask import Blueprint, request, jsonify
-from services.feature_analysis_service import FeatureAnalysisService
+from services.vertex_ai_analysis_service import VertexAIAnalysisService
+from services.crawlee_crawler_service import RecursiveCrawlerService
 import json
+import asyncio
 
 feature_analysis_bp = Blueprint('feature_analysis', __name__)
-feature_service = FeatureAnalysisService()
+vertex_ai_service = VertexAIAnalysisService()
+crawler_service = RecursiveCrawlerService()
 
 @feature_analysis_bp.route('/analyze', methods=['POST'])
 def analyze_features():
@@ -32,8 +35,29 @@ def analyze_features():
         if not our_product_url.startswith(('http://', 'https://')):
             return jsonify({'error': '우리 제품 URL이 유효하지 않습니다'}), 400
         
-        # 기능 분석 실행
-        result = feature_service.analyze_features(competitor_url, our_product_url, features)
+        # 크롤링 및 Vertex AI 분석 실행
+        try:
+            # 1. 경쟁사 사이트 크롤링
+            print(f"경쟁사 사이트 크롤링 시작: {competitor_url}")
+            competitor_data = asyncio.run(crawler_service.crawl_website(competitor_url))
+            print(f"경쟁사 크롤링 완료: {len(competitor_data)}개 페이지")
+            
+            # 2. 우리 제품 사이트 크롤링
+            print(f"우리 제품 사이트 크롤링 시작: {our_product_url}")
+            our_product_data = asyncio.run(crawler_service.crawl_website(our_product_url))
+            print(f"우리 제품 크롤링 완료: {len(our_product_data)}개 페이지")
+            
+            # 3. Vertex AI 분석 실행 (동기 버전 사용)
+            print("Vertex AI 분석 시작...")
+            result = vertex_ai_service.analyze_features_sync(competitor_data, our_product_data)
+            print("Vertex AI 분석 완료")
+            
+        except Exception as e:
+            print(f"분석 중 오류: {e}")
+            result = {
+                'success': False,
+                'error': str(e)
+            }
         
         if result['success']:
             return jsonify({

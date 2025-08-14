@@ -1,4 +1,4 @@
-from celery import Celery
+from celery import shared_task
 from services.crawling_service import CrawlingService
 from models.crawling_result import CrawlingResult, db
 import time
@@ -6,10 +6,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-# Celery 앱 설정
-celery = Celery('feature_detective')
-
-@celery.task(bind=True)
+@shared_task(bind=True)
 def crawl_urls_task(self, project_id, urls):
     """URL 목록 크롤링 Celery 태스크"""
     try:
@@ -78,7 +75,7 @@ def crawl_urls_task(self, project_id, urls):
             'message': '크롤링 중 오류가 발생했습니다.'
         }
 
-@celery.task(bind=True)
+@shared_task(bind=True)
 def crawl_site_task(self, project_id, base_url, follow_links=True):
     """사이트 크롤링 Celery 태스크"""
     try:
@@ -152,7 +149,7 @@ def crawl_site_task(self, project_id, base_url, follow_links=True):
             'message': f'{base_url} 사이트 크롤링 중 오류가 발생했습니다.'
         }
 
-@celery.task(bind=True)
+@shared_task(bind=True)
 def crawl_url_task(self, project_id, url):
     """단일 URL 크롤링 Celery 태스크"""
     try:
@@ -206,7 +203,7 @@ def crawl_url_task(self, project_id, url):
             'message': f'{url} 크롤링 중 오류가 발생했습니다.'
         }
 
-@celery.task
+@shared_task
 def analyze_keywords_task(project_id, url, text_content):
     """키워드 분석 Celery 태스크"""
     try:
@@ -226,7 +223,7 @@ def analyze_keywords_task(project_id, url, text_content):
             'message': '키워드 분석 중 오류가 발생했습니다.'
         }
 
-@celery.task
+@shared_task
 def batch_crawl_task(project_id, urls):
     """배치 크롤링 Celery 태스크"""
     try:
@@ -266,7 +263,7 @@ def batch_crawl_task(project_id, urls):
             'message': '배치 크롤링 중 오류가 발생했습니다.'
         }
 
-@celery.task(bind=True)
+@shared_task(bind=True)
 def crawl_with_retry_task(self, project_id, url, max_retries=3):
     """재시도 로직이 포함된 크롤링 태스크"""
     try:

@@ -2,7 +2,7 @@
 AI 분석 Celery 태스크
 """
 
-from celery import Celery
+from celery import shared_task
 from services.crawling_service import CrawlingService
 from services.vertex_ai_service import VertexAIService
 from models.ai_analysis import AIAnalysis, ExtractedFeature, ProductComparison, db
@@ -11,10 +11,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-# Celery 앱 설정
-celery = Celery('feature_detective')
-
-@celery.task(bind=True)
+@shared_task(bind=True)
 def analyze_crawled_content_task(self, project_id, crawling_result_id):
     """크롤링된 콘텐츠에 AI 분석 수행 태스크"""
     try:
@@ -132,7 +129,7 @@ def analyze_crawled_content_task(self, project_id, crawling_result_id):
             'message': 'AI 분석 중 오류가 발생했습니다.'
         }
 
-@celery.task(bind=True)
+@shared_task(bind=True)
 def analyze_keyword_with_ai_task(self, project_id, keyword, content):
     """AI를 사용한 키워드 분석 태스크"""
     try:
@@ -195,7 +192,7 @@ def analyze_keyword_with_ai_task(self, project_id, keyword, content):
             'message': 'AI 키워드 분석 중 오류가 발생했습니다.'
         }
 
-@celery.task(bind=True)
+@shared_task(bind=True)
 def compare_products_with_ai_task(self, project_id, product1_name, product1_features, 
                                  product2_name, product2_features):
     """AI를 사용한 제품 비교 분석 태스크"""
@@ -283,7 +280,7 @@ def compare_products_with_ai_task(self, project_id, product1_name, product1_feat
             'message': 'AI 제품 비교 분석 중 오류가 발생했습니다.'
         }
 
-@celery.task(bind=True)
+@shared_task(bind=True)
 def batch_ai_analysis_task(self, project_id, crawling_result_ids):
     """배치 AI 분석 태스크"""
     try:

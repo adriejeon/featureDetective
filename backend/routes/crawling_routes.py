@@ -27,13 +27,14 @@ def start_crawling(project_id):
         if not project:
             return jsonify({'error': '프로젝트를 찾을 수 없습니다.'}), 404
         
-        # 비동기 크롤링 태스크 시작
-        task = crawl_urls_task.delay(project_id, urls)
+        # 동기식 크롤링 실행
+        crawling_service = CrawlingService()
+        results = crawling_service.crawl_urls(project_id, urls)
         
         return jsonify({
-            'message': '크롤링이 시작되었습니다.',
-            'task_id': task.id
-        }), 202
+            'message': '크롤링이 완료되었습니다.',
+            'results': results
+        }), 200
         
     except Exception as e:
         logger.error(f"Error starting crawling: {e}")
