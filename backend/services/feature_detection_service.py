@@ -91,7 +91,7 @@ class FeatureDetectionService:
                             product_name
                         )
                     else:
-                        # Vertex AI 사용
+                        # Vertex AI 사용 - 제품 특성 분석 포함
                         features = await self.vertex_ai_analysis._extract_features_from_data(
                             product_info['data'], 
                             product_name
@@ -104,6 +104,17 @@ class FeatureDetectionService:
                             'total_features': 0,
                             'main_categories': [],
                             'document_quality': 'low'
+                        },
+                        'product_analysis': {
+                            'product_characteristics': {
+                                'product_type': '알 수 없음',
+                                'target_audience': '알 수 없음',
+                                'core_value_proposition': '알 수 없음',
+                                'key_strengths': []
+                            },
+                            'feature_analysis': {
+                                'most_important_features': []
+                            }
                         }
                     }
             

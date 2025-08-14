@@ -348,26 +348,42 @@ const CrawlingPage: React.FC = () => {
 
           // 다중 제품 분석 결과 처리
           const analysisResults = data.data.analysis_results;
-          
+
           // 모든 제품의 기능 데이터 수집
           const allProductFeatures: { [key: string]: any[] } = {};
-          
+
           // 크롤링 결과에서 각 제품의 기능 데이터 추출
           if (data.data.crawling_results?.product_data) {
-            Object.keys(data.data.crawling_results.product_data).forEach((productKey) => {
-              const productData = data.data.crawling_results.product_data[productKey];
-              if (productData?.features?.extracted_features) {
-                allProductFeatures[productKey] = productData.features.extracted_features;
-              } else {
-                allProductFeatures[productKey] = [];
+            Object.keys(data.data.crawling_results.product_data).forEach(
+              (productKey) => {
+                const productData =
+                  data.data.crawling_results.product_data[productKey];
+                if (productData?.features?.extracted_features) {
+                  allProductFeatures[productKey] =
+                    productData.features.extracted_features;
+                } else {
+                  allProductFeatures[productKey] = [];
+                }
               }
-            });
+            );
           }
-          
+
           // 기존 방식과의 호환성을 위해 competitor_features와 our_product_features도 유지
-          const competitorFeatures = allProductFeatures['제품1'] || [];
-          const ourProductFeatures = allProductFeatures['제품2'] || [];
-          const thirdProductFeatures = allProductFeatures['제품3'] || [];
+          const competitorFeatures = allProductFeatures["제품1"] || [];
+          const ourProductFeatures = allProductFeatures["제품2"] || [];
+          const thirdProductFeatures = allProductFeatures["제품3"] || [];
+
+          // 제품3 AI 분석 결과 디버깅
+          console.log("=== 제품3 AI 분석 결과 디버깅 ===");
+          console.log("제품3 기능 수:", thirdProductFeatures.length);
+          console.log(
+            "제품3 AI 분석 결과:",
+            analysisResults.product_features?.제품3
+          );
+          console.log(
+            "제품3 제품 특성 분석:",
+            analysisResults.product_features?.제품3?.product_analysis
+          );
 
           // 요약 정보 저장
           setAnalysisSummary({
@@ -390,23 +406,30 @@ const CrawlingPage: React.FC = () => {
               analysisResults.our_product_features?.product_analysis,
             // 제품3 관련 데이터 (3개 제품이 있는 경우)
             ...(validProducts.length >= 3 && {
-              third_product_analysis: allProductFeatures['제품3'] ? {
+              third_product_analysis: analysisResults.product_features?.제품3
+                ?.analysis_summary || {
                 total_features: thirdProductFeatures.length,
-                main_categories: thirdProductFeatures.map((f: any) => f.category).filter((v: any, i: any, a: any) => a.indexOf(v) === i).slice(0, 3),
-                document_quality: 'high'
-              } : null,
-              third_product_product_analysis: allProductFeatures['제품3'] ? {
+                main_categories: thirdProductFeatures
+                  .map((f: any) => f.category)
+                  .filter((v: any, i: any, a: any) => a.indexOf(v) === i)
+                  .slice(0, 3),
+                document_quality: "high",
+              },
+              third_product_product_analysis: analysisResults.product_features
+                ?.제품3?.product_analysis || {
                 product_characteristics: {
-                  product_type: '비즈니스 도구',
-                  target_audience: '기업 사용자',
-                  core_value_proposition: '효율적인 업무 관리',
-                  key_strengths: ['사용자 친화적', '통합 기능', '확장성']
+                  product_type: "비즈니스 도구",
+                  target_audience: "기업 사용자",
+                  core_value_proposition: "효율적인 업무 관리",
+                  key_strengths: ["사용자 친화적", "통합 기능", "확장성"],
                 },
                 feature_analysis: {
-                  most_important_features: thirdProductFeatures.slice(0, 5).map((f: any) => f.name)
-                }
-              } : null
-            })
+                  most_important_features: thirdProductFeatures
+                    .slice(0, 5)
+                    .map((f: any) => f.name),
+                },
+              },
+            }),
           });
 
           // 각 제품의 기능 목록을 그대로 표시
@@ -1171,11 +1194,7 @@ const CrawlingPage: React.FC = () => {
                         {/* 제품3 분석 (3개 제품이 있는 경우) */}
                         {analysisSummary.third_product_analysis && (
                           <Box sx={{ mb: 3 }}>
-                            <Typography
-                              variant="h6"
-                              color="info"
-                              gutterBottom
-                            >
+                            <Typography variant="h6" color="info" gutterBottom>
                               제품3 분석
                             </Typography>
                             <Box
@@ -1290,8 +1309,9 @@ const CrawlingPage: React.FC = () => {
 
                             <Typography variant="body2" sx={{ mb: 1 }}>
                               <strong>제품 특성:</strong>{" "}
-                              {analysisSummary.third_product_analysis
-                                .main_categories?.join(", ")}{" "}
+                              {analysisSummary.third_product_analysis.main_categories?.join(
+                                ", "
+                              )}{" "}
                               분야에 특화된 제품으로, 총{" "}
                               {
                                 analysisSummary.third_product_analysis
@@ -1334,10 +1354,11 @@ const CrawlingPage: React.FC = () => {
                           <Typography variant="h6" gutterBottom>
                             경쟁 분석 결과
                           </Typography>
-                          
+
                           {/* 제품별 장점 표시 */}
                           <Box sx={{ mb: 2 }}>
-                            {analysisSummary.competitive_analysis.product1_advantages?.length > 0 && (
+                            {analysisSummary.competitive_analysis
+                              .product1_advantages?.length > 0 && (
                               <Box sx={{ mb: 2 }}>
                                 <Typography variant="subtitle2" gutterBottom>
                                   제품1의 고유 장점:
@@ -1355,8 +1376,9 @@ const CrawlingPage: React.FC = () => {
                                 </ul>
                               </Box>
                             )}
-                            
-                            {analysisSummary.competitive_analysis.product2_advantages?.length > 0 && (
+
+                            {analysisSummary.competitive_analysis
+                              .product2_advantages?.length > 0 && (
                               <Box sx={{ mb: 2 }}>
                                 <Typography variant="subtitle2" gutterBottom>
                                   제품2의 고유 장점:
@@ -1374,8 +1396,9 @@ const CrawlingPage: React.FC = () => {
                                 </ul>
                               </Box>
                             )}
-                            
-                            {analysisSummary.competitive_analysis.product3_advantages?.length > 0 && (
+
+                            {analysisSummary.competitive_analysis
+                              .product3_advantages?.length > 0 && (
                               <Box sx={{ mb: 2 }}>
                                 <Typography variant="subtitle2" gutterBottom>
                                   제품3의 고유 장점:
@@ -1394,7 +1417,7 @@ const CrawlingPage: React.FC = () => {
                               </Box>
                             )}
                           </Box>
-                          
+
                           {analysisSummary.competitive_analysis
                             .recommendations && (
                             <Box sx={{ mb: 2 }}>
